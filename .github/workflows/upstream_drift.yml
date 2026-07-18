@@ -1,0 +1,23 @@
+name: Open SWE upstream drift
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  upstream-drift:
+    name: Report rebase drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Compare fork with upstream
+        run: scripts/check_upstream_drift.sh

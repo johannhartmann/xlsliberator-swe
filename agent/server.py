@@ -14,6 +14,10 @@ import warnings
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Literal, cast
 
+from .xlsliberator.settings import apply_environment_defaults
+
+apply_environment_defaults()
+
 logger = logging.getLogger(__name__)
 
 from langgraph.graph.state import RunnableConfig

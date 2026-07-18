@@ -29,6 +29,19 @@ Open SWE is the open-source version of this pattern. Built on [LangGraph](https:
 > [!NOTE]
 > 💬 Read the **announcement blog post [here](https://blog.langchain.com/open-swe-an-open-source-framework-for-internal-coding-agents/)**
 
+## XLSLiberator fork
+
+This repository is the thin Open SWE orchestration layer for
+[`johannhartmann/xlsliberator`](https://github.com/johannhartmann/xlsliberator).
+Open SWE's application structure and ordinary coding workflow remain intact;
+workbook-migration customization lives under `agent/xlsliberator/`.
+
+See [the recorded upstream baseline](UPSTREAM_OPEN_SWE.md),
+[the upstream-sync procedure](UPSTREAM_SYNC.md), and
+[the implementation ledger](docs/xlsliberator_implementation_status.md).
+Deployment settings are listed in `config/xlsliberator.env.example`. An empty
+MCP endpoint means the service is unavailable; it is never treated as success.
+
 ---
 
 ## Architecture
