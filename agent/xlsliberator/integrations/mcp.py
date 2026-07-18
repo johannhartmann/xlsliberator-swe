@@ -450,7 +450,12 @@ def _validate_and_namespace(
         if not _TOOL_NAME.fullmatch(original_name):
             raise MCPDiscoveryError(f"{service} returned an invalid tool name")
         try:
-            tool.get_input_schema().model_json_schema()
+            input_schema = tool.get_input_schema()
+            schema_factory = getattr(input_schema, "model_json_schema", None)
+            if schema_factory is None:
+                schema_factory = getattr(input_schema, "schema", None)
+            if not callable(schema_factory) or not isinstance(schema_factory(), dict):
+                raise TypeError("tool input schema is not a JSON object")
         except Exception as exc:  # noqa: BLE001
             raise MCPDiscoveryError(f"{service}.{original_name} has a malformed schema") from exc
         alias = f"xlsliberator_{service}_{original_name}"

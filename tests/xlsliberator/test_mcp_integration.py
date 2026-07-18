@@ -65,10 +65,13 @@ def test_url_policy_accepts_docker_http_and_allowlisted_https() -> None:
     assert validate_mcp_endpoint("http://libreoffice-runtime:8000/mcp", frozenset()) == (
         "libreoffice-runtime"
     )
-    assert validate_mcp_endpoint(
-        "https://runtime.example/mcp",
-        frozenset({"runtime.example"}),
-    ) == "runtime.example"
+    assert (
+        validate_mcp_endpoint(
+            "https://runtime.example/mcp",
+            frozenset({"runtime.example"}),
+        )
+        == "runtime.example"
+    )
 
 
 def test_https_configuration_requires_server_side_token() -> None:
@@ -274,9 +277,7 @@ async def test_discovery_is_namespaced_and_health_is_safe_for_thread_metadata() 
 
     assert metadata["runtime"]["status"] == "AVAILABLE"
     assert metadata["runtime"]["endpoint_host"] == "runtime.example"
-    assert metadata["runtime"]["capabilities"] == [
-        "xlsliberator_runtime_inspect_document"
-    ]
+    assert metadata["runtime"]["capabilities"] == ["xlsliberator_runtime_inspect_document"]
     assert "secret" not in repr(metadata)
 
 
