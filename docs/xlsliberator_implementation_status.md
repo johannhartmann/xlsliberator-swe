@@ -65,14 +65,14 @@ also passed.
 | 15 — deterministic middleware | COMPLETE AT `49164719` | ordered checkpoints, resume, mutation and anti-fake-success gates |
 | 16 — migration lead | COMPLETE AT `18e0d770` | deterministic lead trajectory, feature routing and terminal evidence contract |
 | 17 — independent reviewer | COMPLETE; REMOTE CI GREEN AT `7c7ee4c8` | independent identity, read-only review, hidden-test and artifact-digest approval gate; Agent and sandbox runs `29654989184` and `29654989178` |
-| 18 — web threads | IMPLEMENTED; CI EVIDENCE PENDING | authenticated owner-scoped status/events/messages/artifacts/final API, deterministic thread mapping, retention, safe publication and fake-service integration |
-| 19 — demos and corpus | PENDING | representative public episodes |
-| 20 — repair promotion | PENDING | repair PR flow and build-farm boundary |
+| 18 — web threads | COMPLETE; REMOTE CI GREEN AT `6a7f22bc` | authenticated owner-scoped status/events/messages/artifacts/final API, deterministic thread mapping, retention, safe publication and fake-service integration |
+| 19 — demos and corpus | COMPLETE IN `xlsliberator`; CI FINALIZATION IN PROGRESS | eight licensed serious episodes, behavioral scenarios, searchable public subsets, evidence-derived reporting |
+| 20 — repair promotion | IMPLEMENTED ACROSS BOTH REPOSITORIES; CI EVIDENCE PENDING | exact eight-stage state machine, immutable layer classification, pinned LO identities, corpus/build-farm boundaries, validator and independent-review gates |
 | 21 — execution hardening | PENDING | sandbox, network, secret, and retention controls |
 | 22 — LangSmith evaluations | PENDING | datasets, evaluators, thresholds, release gate |
 | 23 — autonomous showcase | PENDING | reproducible migration and independent verdict |
 
 ## Next action
 
-Obtain blocking CI evidence for Prompt 18, then add the serious public demo and
-corpus structure required by Prompt 19.
+Obtain blocking CI evidence for Prompts 19–20, then begin hostile-workbook
+execution hardening for Prompt 21.

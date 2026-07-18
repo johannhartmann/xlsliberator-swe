@@ -67,3 +67,29 @@ both controls are present:
 Even then, build-farm tools are limited to the LibreOffice engineer and the
 authorized migration lead. Workbook content and model output cannot grant this
 authority.
+
+## Generic repair promotion
+
+`agent/xlsliberator/repair.py` binds the MCP operations into one durable,
+fail-closed workflow:
+
+1. reproduce;
+2. minimize;
+3. add the failing regression;
+4. patch the classified owner layer;
+5. rerun the exact scenario;
+6. run the affected corpus;
+7. obtain independent approval;
+8. open the focused upstream review.
+
+Stages cannot be reordered or skipped. LibreOffice repairs cannot enter the
+patch stage without the pinned `26.2.4.2` source archive, source commit, patch
+set, and stock/patched runtime identities. Completion also requires the
+validator hash to remain unchanged, so weakening an assertion cannot be
+promoted as a fix.
+
+The public corpus service supplies redistributable fixtures and prior failures.
+The reviewer alone receives sanitized hidden-suite results. The build farm is
+the only mutation boundary for LibreOffice source and returns unavailable when
+its isolated backend is absent; the Open-SWE application never falls back to a
+local source build.
