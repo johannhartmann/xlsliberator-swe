@@ -54,7 +54,7 @@ format:
 	uv run ruff check --fix $(PYTHON_FILES)
 
 format-check:
-	uv run ruff format $(PYTHON_FILES) --check
+	uv run ruff format $(PYTHON_FILES) --check --diff
 
 typecheck:
 	npx --yes basedpyright agent tests
