@@ -1,0 +1,28 @@
+name: Refresh dependency lock
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ["feat/xlsliberator-foundation"]
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Refresh lock
+        run: uv lock
+      - name: Capture generated lock and diff
+        run: |
+          mkdir -p lock-refresh
+          cp uv.lock lock-refresh/uv.lock
+          git diff -- uv.lock > lock-refresh/uv.lock.diff
+      - name: Upload generated lock
+        uses: actions/upload-artifact@v7
+        with:
+          name: refreshed-uv-lock
+          path: lock-refresh
+          retention-days: 1
