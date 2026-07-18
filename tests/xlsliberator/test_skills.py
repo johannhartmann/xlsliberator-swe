@@ -162,12 +162,8 @@ async def test_load_validated_skills_rejects_inaccessible_source() -> None:
 def test_main_sources_are_ordered_and_specialists_are_isolated() -> None:
     settings = XLSLiberatorSettings.from_env(
         {
-            "XLSLIBERATOR_TEAM_SKILL_SOURCES": (
-                "/workspace/.xlsliberator-skills/team/primary"
-            ),
-            "XLSLIBERATOR_USER_SKILL_SOURCES": (
-                "/workspace/.xlsliberator-skills/user/johann"
-            ),
+            "XLSLIBERATOR_TEAM_SKILL_SOURCES": ("/workspace/.xlsliberator-skills/team/primary"),
+            "XLSLIBERATOR_USER_SKILL_SOURCES": ("/workspace/.xlsliberator-skills/user/johann"),
         }
     )
 

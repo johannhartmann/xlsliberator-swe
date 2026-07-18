@@ -80,12 +80,9 @@ def test_settings_accept_deployment_overrides() -> None:
             "XLSLIBERATOR_SKILLS_REPO_NAME": "trusted-repo",
             "XLSLIBERATOR_SKILLS_REPO_REF": "0123456789abcdef",
             "XLSLIBERATOR_TEAM_SKILL_SOURCES": (
-                "/workspace/.xlsliberator-skills/team/one,"
-                "/workspace/.xlsliberator-skills/team/two"
+                "/workspace/.xlsliberator-skills/team/one,/workspace/.xlsliberator-skills/team/two"
             ),
-            "XLSLIBERATOR_USER_SKILL_SOURCES": (
-                "/workspace/.xlsliberator-skills/user/one"
-            ),
+            "XLSLIBERATOR_USER_SKILL_SOURCES": ("/workspace/.xlsliberator-skills/user/one"),
         }
     )
 
@@ -114,9 +111,7 @@ def test_settings_accept_deployment_overrides() -> None:
         "/workspace/.xlsliberator-skills/team/one/",
         "/workspace/.xlsliberator-skills/team/two/",
     )
-    assert settings.user_skill_sources == (
-        "/workspace/.xlsliberator-skills/user/one/",
-    )
+    assert settings.user_skill_sources == ("/workspace/.xlsliberator-skills/user/one/",)
 
 
 def test_environment_defaults_do_not_replace_explicit_values() -> None:

@@ -24,6 +24,9 @@ jobs:
         run: uv sync --locked --extra dev
       - name: Run lint
         run: make lint
+      - name: Show suggested lint fixes
+        if: failure()
+        run: uv run ruff check . --fix --diff
 
   skill-lint:
     name: Workbook skill lint

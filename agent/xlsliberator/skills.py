@@ -121,9 +121,7 @@ def parse_skill_metadata(
     """Strictly parse one metadata header without placing the body in a prompt."""
 
     if len(content) > MAX_SKILL_FILE_BYTES:
-        raise SkillValidationError(
-            f"{skill_path}: SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes"
-        )
+        raise SkillValidationError(f"{skill_path}: SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -132,9 +130,7 @@ def parse_skill_metadata(
 
     name = _required_string(metadata, "name", skill_path)
     if not _SKILL_NAME.fullmatch(name) or name != directory_name:
-        raise SkillValidationError(
-            f"{skill_path}: name must match its lowercase-hyphen directory"
-        )
+        raise SkillValidationError(f"{skill_path}: name must match its lowercase-hyphen directory")
 
     description = _required_string(metadata, "description", skill_path)
     if (
@@ -157,8 +153,7 @@ def parse_skill_metadata(
         raise SkillValidationError(f"{skill_path}: license must be a string")
     arbitrary_metadata = metadata.get("metadata", {})
     if not isinstance(arbitrary_metadata, dict) or not all(
-        isinstance(key, str) and isinstance(value, str)
-        for key, value in arbitrary_metadata.items()
+        isinstance(key, str) and isinstance(value, str) for key, value in arbitrary_metadata.items()
     ):
         raise SkillValidationError(f"{skill_path}: metadata values must be strings")
 
@@ -251,8 +246,7 @@ async def _materialize_builtin_skills(backend: SandboxBackendProtocol) -> None:
     if total_bytes > MAX_BUNDLED_SOURCE_BYTES:
         raise SkillValidationError("built-in skill source exceeds its total size limit")
     result = await backend.aexecute(
-        f"rm -rf {shlex.quote(BUILTIN_SKILLS_ROOT)} && "
-        f"mkdir -p {shlex.quote(BUILTIN_SKILLS_ROOT)}"
+        f"rm -rf {shlex.quote(BUILTIN_SKILLS_ROOT)} && mkdir -p {shlex.quote(BUILTIN_SKILLS_ROOT)}"
     )
     if result.exit_code not in (0, None):
         raise RuntimeError("failed to prepare the built-in skill destination")
@@ -283,8 +277,8 @@ async def _materialize_project_skills(
             f"git -C {quoted_repository_dir} fetch --quiet --depth=1 origin -- {quoted_ref}",
             f"git -C {quoted_repository_dir} archive FETCH_HEAD skills/ "
             f"| tar -x --strip-components=1 -C {quoted_destination}",
-            f'if find {quoted_destination} -type l -print -quit | grep -q .; then exit 43; fi',
-            f'if find {quoted_destination} -type f -size +1M -print -quit | grep -q .; '
+            f"if find {quoted_destination} -type l -print -quit | grep -q .; then exit 43; fi",
+            f"if find {quoted_destination} -type f -size +1M -print -quit | grep -q .; "
             "then exit 44; fi",
             f'test "$(du -sk {quoted_destination} | cut -f1)" -le 4096',
             f'printf "trusted_skills_sha=%s\\n" '
