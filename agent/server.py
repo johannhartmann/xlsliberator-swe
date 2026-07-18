@@ -157,6 +157,7 @@ from .xlsliberator.middleware import WorkbookAttachmentMiddleware
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.settings import XLSLiberatorSettings
 from .xlsliberator.skills import MigrationSkillsMiddleware
+from .xlsliberator.subagents import subagents_for_task_kind
 
 client = get_client()
 
@@ -969,6 +970,12 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         use_gateway=use_gateway,
         **subagent_model_kwargs,
     )
+    migration_subagents = subagents_for_task_kind(
+        configurable.get("task_kind"),
+        model=subagent_model,
+        tools=[],
+        migration_task_kind=WORKBOOK_MIGRATION_TASK_KIND,
+    )
     return create_deep_agent(
         model=main_model,
         system_prompt="",
@@ -1002,6 +1009,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         subagents=[
             _general_purpose_subagent(subagent_model),
             *([_browser_subagent(subagent_model, browser_tools)] if browser_tools else []),
+            *migration_subagents,
         ],
         backend=backend_factory,
         middleware=cast(

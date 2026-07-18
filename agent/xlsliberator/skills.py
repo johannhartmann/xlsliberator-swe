@@ -19,8 +19,8 @@ from deepagents.backends.protocol import (
 )
 from deepagents.middleware.skills import (
     SkillMetadata,
-    SkillSource,
     SkillsMiddleware,
+    SkillSource,
     SkillsState,
     SkillsStateUpdate,
 )
@@ -35,6 +35,23 @@ BUILTIN_SKILLS_ROOT = f"{DEFAULT_SKILLS_ROOT}/builtin"
 PROJECT_SKILLS_ROOT = f"{DEFAULT_SKILLS_ROOT}/project"
 SPECIALIST_SKILLS_ROOT = f"{DEFAULT_SKILLS_ROOT}/specialists"
 BUILTIN_SKILLS_PACKAGE = Path(__file__).resolve().parent.parent / "skills" / "xlsliberator"
+SPECIALIST_SKILL_NAMES: dict[str, tuple[str, ...]] = {
+    "workbook-forensics": ("workbook-forensics", "secure-workbook-execution"),
+    "formula-engineer": ("formula-migration", "migration-test-design"),
+    "vba-liberation-engineer": ("vba-to-python-uno", "migration-test-design"),
+    "ui-migration-engineer": (
+        "userform-to-uno",
+        "activex-to-open-controls",
+        "visual-validation",
+    ),
+    "dependency-liberation-engineer": (
+        "windows-dependency-replacement",
+        "open-service-adapter",
+    ),
+    "libreoffice-engineer": ("libreoffice-debugging", "libreoffice-core-patching"),
+    "test-adversary": ("migration-test-design", "migration-mutation-testing"),
+    "failure-minimizer": ("workbook-failure-minimization", "ods-package-surgery"),
+}
 
 MAX_SKILL_FILE_BYTES = 128 * 1024
 MAX_BUNDLED_FILE_BYTES = 1024 * 1024
@@ -301,6 +318,27 @@ async def _materialize_project_skills(
     return identity
 
 
+async def _materialize_specialist_skills(backend: SandboxBackendProtocol) -> None:
+    quoted_root = shlex.quote(SPECIALIST_SKILLS_ROOT)
+    commands = ["set -eu", f"rm -rf {quoted_root}", f"mkdir -p {quoted_root}"]
+    for specialist_name, skill_names in SPECIALIST_SKILL_NAMES.items():
+        destination = f"{SPECIALIST_SKILLS_ROOT}/{specialist_name}"
+        commands.append(f"mkdir -p {shlex.quote(destination)}")
+        for skill_name in skill_names:
+            source = f"{PROJECT_SKILLS_ROOT}/{skill_name}"
+            commands.append(
+                f"test -f {shlex.quote(f'{source}/SKILL.md')} && "
+                f"cp -R {shlex.quote(source)} {shlex.quote(destination)}/"
+            )
+    commands.append(f'if find {quoted_root} -type l -print -quit | grep -q .; then exit 45; fi')
+    result = await backend.aexecute(
+        "\n".join(commands),
+        timeout=MATERIALIZATION_TIMEOUT_SECONDS,
+    )
+    if result.exit_code not in (0, None):
+        raise RuntimeError("failed to materialize isolated specialist skills")
+
+
 class MigrationSkillsMiddleware(SkillsMiddleware):
     """Materialize trusted sources, then expose only their strict metadata."""
 
@@ -332,6 +370,7 @@ class MigrationSkillsMiddleware(SkillsMiddleware):
             resolved_backend,
             self._xlsliberator_settings,
         )
+        await _materialize_specialist_skills(resolved_backend)
         skills = await load_validated_skills(
             resolved_backend,
             migration_skill_sources(self._xlsliberator_settings),

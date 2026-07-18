@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+from typing import Any, cast
+
+import pytest
+from deepagents.middleware.filesystem import FilesystemPermission
+from langchain_core.language_models import BaseChatModel
+
+from agent.xlsliberator.skills import SPECIALIST_SKILL_NAMES, SPECIALIST_SKILLS_ROOT
+from agent.xlsliberator.subagents import (
+    SPECIALIST_BY_NAME,
+    SPECIALIST_PROFILES,
+    XLSLIBERATOR_SUBAGENTS,
+    SpecialistResult,
+    SpecialistTraceMiddleware,
+    build_migration_subagents,
+    candidate_tournament,
+    specialist_trace_metadata,
+    subagents_for_task_kind,
+)
+
+
+def _model() -> BaseChatModel:
+    return cast(BaseChatModel, object())
+
+
+def _tools(*names: str) -> list[dict[str, Any]]:
+    return [{"name": name} for name in names]
+
+
+def _tool_names(spec: dict[str, Any]) -> list[str]:
+    return [tool["name"] for tool in cast(list[dict[str, str]], spec["tools"])]
+
+
+def test_specialist_catalog_has_required_roles_and_isolated_skill_views() -> None:
+    assert XLSLIBERATOR_SUBAGENTS == (
+        "workbook-forensics",
+        "formula-engineer",
+        "vba-liberation-engineer",
+        "ui-migration-engineer",
+        "dependency-liberation-engineer",
+        "libreoffice-engineer",
+        "test-adversary",
+        "failure-minimizer",
+    )
+    assert {profile.name: profile.skill_names for profile in SPECIALIST_PROFILES} == (
+        SPECIALIST_SKILL_NAMES
+    )
+
+    specs = build_migration_subagents(_model(), [])
+
+    for spec in specs:
+        assert spec["skills"] == [f"{SPECIALIST_SKILLS_ROOT}/{spec['name']}/"]
+        assert "must not certify or approve" in spec["system_prompt"]
+        assert "self_certified=false" in spec["system_prompt"]
+        assert spec["response_format"] is SpecialistResult
+        assert isinstance(spec["middleware"][0], SpecialistTraceMiddleware)
+
+
+def test_tool_allowlists_drop_unrelated_and_hidden_tools() -> None:
+    specs = build_migration_subagents(
+        _model(),
+        _tools(
+            "xlsliberator_runtime_inspect",
+            "xlsliberator_migration_check",
+            "xlsliberator_corpus_run_public",
+            "xlsliberator_corpus_run_hidden",
+            "xlsliberator_buildfarm_apply_patch",
+        ),
+    )
+    by_name = {spec["name"]: spec for spec in specs}
+
+    assert _tool_names(cast(dict[str, Any], by_name["workbook-forensics"])) == [
+        "xlsliberator_runtime_inspect"
+    ]
+    assert _tool_names(cast(dict[str, Any], by_name["test-adversary"])) == [
+        "xlsliberator_migration_check",
+        "xlsliberator_corpus_run_public",
+    ]
+    assert "xlsliberator_corpus_run_hidden" not in {
+        name for spec in specs for name in _tool_names(cast(dict[str, Any], spec))
+    }
+    assert _tool_names(cast(dict[str, Any], by_name["libreoffice-engineer"])) == [
+        "xlsliberator_runtime_inspect",
+        "xlsliberator_buildfarm_apply_patch",
+    ]
+
+
+def test_filesystem_policy_prevents_test_adversary_from_writing_candidates() -> None:
+    test_adversary = next(
+        spec
+        for spec in build_migration_subagents(_model(), [])
+        if spec["name"] == "test-adversary"
+    )
+    permissions = cast(list[FilesystemPermission], test_adversary["permissions"])
+
+    assert permissions[0].operations == ["read"]
+    assert permissions[0].paths == ["/**"]
+    assert "/workspace/migration/acceptance/**" in permissions[1].paths
+    assert all("/candidates/" not in path for path in permissions[1].paths)
+    assert permissions[-1].operations == ["write"]
+    assert permissions[-1].mode == "deny"
+
+
+def test_domain_subagents_are_absent_for_ordinary_tasks() -> None:
+    assert (
+        subagents_for_task_kind(
+            "coding",
+            model=_model(),
+            tools=[],
+            migration_task_kind="workbook_migration",
+        )
+        == []
+    )
+    migration = subagents_for_task_kind(
+        "workbook_migration",
+        model=_model(),
+        tools=[],
+        migration_task_kind="workbook_migration",
+    )
+    assert [spec["name"] for spec in migration] == list(XLSLIBERATOR_SUBAGENTS)
+
+
+def test_specialist_model_and_effort_routing_are_explicit() -> None:
+    model = _model()
+
+    specs = build_migration_subagents(model, [])
+
+    assert all(spec["model"] is model for spec in specs)
+    assert all(SPECIALIST_BY_NAME[spec["name"]].effort == "high" for spec in specs)
+    metadata = specialist_trace_metadata("formula-engineer")
+    assert metadata["agent_role"] == "formula-engineer"
+    assert metadata["preferred_effort"] == "high"
+    assert "/workspace/migration/candidates/formula-engineer/**" in cast(
+        tuple[str, ...], metadata["artifact_paths"]
+    )
+
+
+def test_candidate_tournament_isolates_two_candidates_and_evaluator() -> None:
+    tournament = candidate_tournament(
+        "pricing/MonthEnd",
+        ("formula-engineer", "vba-liberation-engineer"),
+    )
+
+    assert tournament.module_id == "pricing-MonthEnd"
+    assert tournament.candidate_agents == (
+        "formula-engineer",
+        "vba-liberation-engineer",
+    )
+    assert tournament.candidate_paths[0] != tournament.candidate_paths[1]
+    assert tournament.evaluator_agent == "test-adversary"
+    assert tournament.evidence_path.endswith("/evaluation.json")
+
+
+@pytest.mark.parametrize(
+    ("agents", "evaluator"),
+    [
+        (("formula-engineer", "formula-engineer"), "test-adversary"),
+        (("unknown", "formula-engineer"), "test-adversary"),
+        (("formula-engineer", "vba-liberation-engineer"), "formula-engineer"),
+    ],
+)
+def test_candidate_tournament_rejects_non_independent_roles(
+    agents: tuple[str, str],
+    evaluator: str,
+) -> None:
+    with pytest.raises(ValueError):
+        candidate_tournament("module", agents, evaluator_agent=evaluator)
