@@ -1,4 +1,4 @@
-.PHONY: all format format-check lint typecheck test tests integration_tests help run dev
+.PHONY: all format format-check lint skill-lint typecheck test tests integration_tests help run dev
 
 # Default target executed when no arguments are given to make.
 all: help
@@ -46,6 +46,9 @@ lint:
 	uv run ruff check $(PYTHON_FILES)
 	uv run ruff format $(PYTHON_FILES) --diff
 
+skill-lint:
+	uv run python -m agent.xlsliberator.skill_lint
+
 format:
 	uv run ruff format $(PYTHON_FILES)
 	uv run ruff check --fix $(PYTHON_FILES)
@@ -67,6 +70,7 @@ help:
 	@echo 'install                      - install dependencies (incl. dev extras)'
 	@echo 'format                       - run code formatters'
 	@echo 'lint                         - run linters'
+	@echo 'skill-lint                   - validate workbook-migration skills'
 	@echo 'typecheck                    - run basedpyright on agent/ and tests/'
 	@echo 'test                         - run unit tests'
 	@echo 'integration_tests            - run integration tests'

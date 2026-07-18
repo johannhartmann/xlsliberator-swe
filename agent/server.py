@@ -154,6 +154,9 @@ from .utils.sandbox_state import (
 )
 from .utils.tracing import AGENT_TRACING_PROJECT, traced_graph_factory
 from .xlsliberator.middleware import WorkbookAttachmentMiddleware
+from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
+from .xlsliberator.settings import XLSLiberatorSettings
+from .xlsliberator.skills import MigrationSkillsMiddleware
 
 client = get_client()
 
@@ -934,6 +937,14 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     )
     corridor_tools = await _load_corridor_mcp_tools()
     browser_tools = load_browser_tools()
+    migration_skills_middleware: list[Any] = []
+    if configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND:
+        migration_skills_middleware.append(
+            MigrationSkillsMiddleware(
+                backend=backend_factory,
+                settings=XLSLiberatorSettings.from_env(),
+            )
+        )
 
     currents_tools: list[Any] = []
     notion_tools: list[Any] = []
@@ -1011,6 +1022,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                     corridor_enabled=bool(corridor_tools),
                 ),
                 WorkbookAttachmentMiddleware(configurable),
+                *migration_skills_middleware,
                 SanitizeToolInputsMiddleware(),
                 ModelCallLimitMiddleware(run_limit=MODEL_CALL_RECURSION_LIMIT, exit_behavior="end"),
                 ToolErrorMiddleware(),

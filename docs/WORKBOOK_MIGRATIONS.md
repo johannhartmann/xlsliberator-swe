@@ -53,6 +53,30 @@ GitHub issue/PR attachments and optional Slack/Linear attachments use this same
 trigger contract after their existing webhook layer has safely retrieved the
 attachment. They must not bypass hash, media, archive or authorization checks.
 
+## Progressive-disclosure skills
+
+Only the main agent for `task_kind=workbook_migration` receives migration
+skills. Deep Agents exposes names, descriptions, compatibility and declared
+tools first; the agent reads a full `SKILL.md` or its resources only when the
+task makes that skill relevant. Ordinary coding tasks and general-purpose or
+browser subagents do not inherit these sources.
+
+Sources are loaded with deterministic last-wins precedence: bundled Open-SWE
+orchestration guidance, the approved XLSLiberator repository's `skills/`
+directory, optional team sources, then optional user sources. The project
+source is exported from the deployment-approved repository and ref into a
+separate sandbox path. A task branch, pull-request head, workbook, or user
+message cannot select the source ref or inject a skill. Optional sources must be
+pre-materialized by trusted deployment code below
+`/workspace/.xlsliberator-skills/`.
+
+Every skill must use a matching lowercase-hyphen directory and `name`, explain
+what it does and when to use it, declare compatibility and allowed or
+recommended tools, remain below the size limit, and pass `make skill-lint`.
+When a generic migration fix becomes reusable, update the relevant project
+skill, validate it, and submit the change through the normal review flow.
+Customer workbook content must never be copied into skill instructions.
+
 ## Docker-only operation
 
 The API service, migration sandbox, `xlsprobe`, Python, LibreOffice, UNO and

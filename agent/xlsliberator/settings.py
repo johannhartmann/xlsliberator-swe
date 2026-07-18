@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import posixpath
+import re
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 
@@ -22,6 +24,12 @@ DEFAULT_SANDBOX_PIDS_LIMIT = 1024
 DEFAULT_SANDBOX_COMMAND_TIMEOUT_SECONDS = 30 * 60
 DEFAULT_SANDBOX_IDLE_TTL_SECONDS = 2 * 60 * 60
 DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS = 24 * 60 * 60
+DEFAULT_SKILLS_REPO_OWNER = DEFAULT_REPO_OWNER
+DEFAULT_SKILLS_REPO_NAME = DEFAULT_REPO_NAME
+DEFAULT_SKILLS_REPO_REF = "main"
+DEFAULT_SKILLS_ROOT = "/workspace/.xlsliberator-skills"
+
+_REPOSITORY_COMPONENT = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 def _value(env: Mapping[str, str], name: str, default: str) -> str:
@@ -49,6 +57,26 @@ def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
     return value
 
 
+def _repository_component(env: Mapping[str, str], name: str, default: str) -> str:
+    value = _value(env, name, default)
+    if not _REPOSITORY_COMPONENT.fullmatch(value) or value in {".", ".."}:
+        raise ValueError(f"{name} contains unsupported characters")
+    return value
+
+
+def _trusted_skill_paths(env: Mapping[str, str], name: str) -> tuple[str, ...]:
+    raw_value = env.get(name, "")
+    if not raw_value.strip():
+        return ()
+    paths: list[str] = []
+    for raw_path in raw_value.split(","):
+        path = posixpath.normpath(raw_path.strip())
+        if path == DEFAULT_SKILLS_ROOT or not path.startswith(f"{DEFAULT_SKILLS_ROOT}/"):
+            raise ValueError(f"{name} paths must be below {DEFAULT_SKILLS_ROOT}")
+        paths.append(f"{path}/")
+    return tuple(paths)
+
+
 @dataclass(frozen=True, slots=True)
 class XLSLiberatorSettings:
     """Configuration owned by the XLSLiberator customization namespace."""
@@ -71,6 +99,11 @@ class XLSLiberatorSettings:
     sandbox_command_timeout_seconds: int
     sandbox_idle_ttl_seconds: int
     sandbox_delete_after_stop_seconds: int
+    skills_repo_owner: str
+    skills_repo_name: str
+    skills_repo_ref: str
+    team_skill_sources: tuple[str, ...]
+    user_skill_sources: tuple[str, ...]
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> XLSLiberatorSettings:
@@ -161,6 +194,29 @@ class XLSLiberatorSettings:
                 source,
                 "XLSLIBERATOR_SANDBOX_DELETE_AFTER_STOP_SECONDS",
                 DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS,
+            ),
+            skills_repo_owner=_repository_component(
+                source,
+                "XLSLIBERATOR_SKILLS_REPO_OWNER",
+                DEFAULT_SKILLS_REPO_OWNER,
+            ),
+            skills_repo_name=_repository_component(
+                source,
+                "XLSLIBERATOR_SKILLS_REPO_NAME",
+                DEFAULT_SKILLS_REPO_NAME,
+            ),
+            skills_repo_ref=_value(
+                source,
+                "XLSLIBERATOR_SKILLS_REPO_REF",
+                DEFAULT_SKILLS_REPO_REF,
+            ),
+            team_skill_sources=_trusted_skill_paths(
+                source,
+                "XLSLIBERATOR_TEAM_SKILL_SOURCES",
+            ),
+            user_skill_sources=_trusted_skill_paths(
+                source,
+                "XLSLIBERATOR_USER_SKILL_SOURCES",
             ),
         )
 

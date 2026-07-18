@@ -18,6 +18,9 @@ from agent.xlsliberator.settings import (
     DEFAULT_SANDBOX_IMAGE_VERSION,
     DEFAULT_SANDBOX_MEMORY_BYTES,
     DEFAULT_SANDBOX_PIDS_LIMIT,
+    DEFAULT_SKILLS_REPO_NAME,
+    DEFAULT_SKILLS_REPO_OWNER,
+    DEFAULT_SKILLS_REPO_REF,
     DEFAULT_SPECIALIST_MODEL,
     XLSLiberatorSettings,
     apply_environment_defaults,
@@ -45,6 +48,11 @@ def test_settings_have_deterministic_fork_defaults() -> None:
     assert settings.sandbox_command_timeout_seconds == DEFAULT_SANDBOX_COMMAND_TIMEOUT_SECONDS
     assert settings.sandbox_idle_ttl_seconds == DEFAULT_SANDBOX_IDLE_TTL_SECONDS
     assert settings.sandbox_delete_after_stop_seconds == DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS
+    assert settings.skills_repo_owner == DEFAULT_SKILLS_REPO_OWNER
+    assert settings.skills_repo_name == DEFAULT_SKILLS_REPO_NAME
+    assert settings.skills_repo_ref == DEFAULT_SKILLS_REPO_REF
+    assert settings.team_skill_sources == ()
+    assert settings.user_skill_sources == ()
 
 
 def test_settings_accept_deployment_overrides() -> None:
@@ -68,6 +76,16 @@ def test_settings_accept_deployment_overrides() -> None:
             "XLSLIBERATOR_SANDBOX_COMMAND_TIMEOUT_SECONDS": "4000",
             "XLSLIBERATOR_SANDBOX_IDLE_TTL_SECONDS": "5000",
             "XLSLIBERATOR_SANDBOX_DELETE_AFTER_STOP_SECONDS": "6000",
+            "XLSLIBERATOR_SKILLS_REPO_OWNER": "trusted-owner",
+            "XLSLIBERATOR_SKILLS_REPO_NAME": "trusted-repo",
+            "XLSLIBERATOR_SKILLS_REPO_REF": "0123456789abcdef",
+            "XLSLIBERATOR_TEAM_SKILL_SOURCES": (
+                "/workspace/.xlsliberator-skills/team/one,"
+                "/workspace/.xlsliberator-skills/team/two"
+            ),
+            "XLSLIBERATOR_USER_SKILL_SOURCES": (
+                "/workspace/.xlsliberator-skills/user/one"
+            ),
         }
     )
 
@@ -89,6 +107,16 @@ def test_settings_accept_deployment_overrides() -> None:
     assert settings.sandbox_command_timeout_seconds == 4000
     assert settings.sandbox_idle_ttl_seconds == 5000
     assert settings.sandbox_delete_after_stop_seconds == 6000
+    assert settings.skills_repo_owner == "trusted-owner"
+    assert settings.skills_repo_name == "trusted-repo"
+    assert settings.skills_repo_ref == "0123456789abcdef"
+    assert settings.team_skill_sources == (
+        "/workspace/.xlsliberator-skills/team/one/",
+        "/workspace/.xlsliberator-skills/team/two/",
+    )
+    assert settings.user_skill_sources == (
+        "/workspace/.xlsliberator-skills/user/one/",
+    )
 
 
 def test_environment_defaults_do_not_replace_explicit_values() -> None:
@@ -142,3 +170,10 @@ def test_required_setting_rejects_explicit_empty_value() -> None:
 def test_resource_setting_rejects_invalid_values(value: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         XLSLiberatorSettings.from_env({"XLSLIBERATOR_SANDBOX_CPU_COUNT": value})
+
+
+def test_skill_sources_must_remain_below_trusted_root() -> None:
+    with pytest.raises(ValueError, match="paths must be below"):
+        XLSLiberatorSettings.from_env(
+            {"XLSLIBERATOR_TEAM_SKILL_SOURCES": "/workspace/untrusted/skills"}
+        )
