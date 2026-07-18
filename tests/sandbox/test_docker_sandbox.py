@@ -255,7 +255,12 @@ def test_download_files_returns_binary_and_normalized_errors() -> None:
 
 def test_create_docker_sandbox_creates_and_validates_container() -> None:
     name = f"xlsliberator-swe-{'a' * 24}"
+    settings = _settings()
     with (
+        patch(
+            "agent.integrations.docker.XLSLiberatorSettings.from_env",
+            return_value=settings,
+        ),
         patch("agent.integrations.docker._validated_image", return_value=IMAGE_ID),
         patch("agent.integrations.docker._create_container", return_value=name) as create,
         patch("agent.integrations.docker._validate_container") as validate,
@@ -263,11 +268,11 @@ def test_create_docker_sandbox_creates_and_validates_container() -> None:
         backend = docker.create_docker_sandbox()
 
     assert backend.id == name
-    create.assert_called_once_with(_settings(), IMAGE_ID)
+    create.assert_called_once_with(settings, IMAGE_ID)
     validate.assert_called_once_with(
         name,
         expected_image_id=IMAGE_ID,
-        settings=_settings(),
+        settings=settings,
     )
 
 

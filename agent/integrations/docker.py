@@ -122,8 +122,7 @@ def _run_docker(
         return subprocess.run(
             ["docker", *arguments],
             input=input_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
             timeout=timeout,
         )
@@ -173,9 +172,7 @@ def _validated_image(settings: XLSLiberatorSettings) -> str:
     }
     for name, expected in expected_labels.items():
         if labels.get(name) != expected:
-            raise SandboxClientError(
-                f"Docker sandbox image label {name} must equal {expected!r}"
-            )
+            raise SandboxClientError(f"Docker sandbox image label {name} must equal {expected!r}")
     for name in (_OPEN_SWE_REVISION_LABEL, _XLSLIBERATOR_REVISION_LABEL):
         value = labels.get(name)
         if not isinstance(value, str) or not _SOURCE_REVISION.fullmatch(value):
@@ -232,11 +229,7 @@ def _validate_container(
         "OPENAI_API_KEY",
     }
     environment_names = (
-        {
-            value.partition("=")[0]
-            for value in environment
-            if isinstance(value, str)
-        }
+        {value.partition("=")[0] for value in environment if isinstance(value, str)}
         if isinstance(environment, list)
         else set()
     )
