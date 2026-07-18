@@ -9,6 +9,7 @@ import os
 from typing import Any
 
 from deepagents.backends.protocol import SandboxBackendProtocol
+
 logger = logging.getLogger(__name__)
 
 IDENTITY_COMMAND = "xlsliberator-sandbox-identity"
@@ -35,7 +36,9 @@ def parse_identity_output(output: object) -> dict[str, Any] | None:
         "xlsliberator_commit",
         "libreoffice_build",
     }
-    if not required.issubset(image) or not all(isinstance(image[key], str) for key in required):
+    if not required.issubset(image) or not all(
+        isinstance(image[key], str) for key in required
+    ):
         return None
     return payload
 

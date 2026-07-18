@@ -14,8 +14,8 @@ import warnings
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Literal, cast
 
-from .xlsliberator.settings import apply_environment_defaults
 from .xlsliberator.sandbox_identity import record_sandbox_identity
+from .xlsliberator.settings import apply_environment_defaults
 
 apply_environment_defaults()
 
