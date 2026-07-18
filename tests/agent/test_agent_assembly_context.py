@@ -147,7 +147,7 @@ async def test_migration_uses_explicit_primary_and_specialist_models(
     monkeypatch.setenv("XLSLIBERATOR_PRIMARY_MODEL", "openai:openai/gpt-4.1")
     monkeypatch.setenv("XLSLIBERATOR_SPECIALIST_MODEL", "openai:openai/gpt-4.1")
     config = _base_config()
-    configurable = config["configurable"]
+    configurable = config.setdefault("configurable", {})
     assert isinstance(configurable, dict)
     configurable["task_kind"] = "workbook_migration"
 

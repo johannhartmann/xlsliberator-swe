@@ -119,9 +119,7 @@ def _direct_openai_defaults() -> tuple[str, bool]:
     raw_responses = os.environ.get(OPENAI_USE_RESPONSES_API_ENV, "").strip().lower()
     if not raw_base_url:
         if raw_responses:
-            raise ValueError(
-                f"{OPENAI_USE_RESPONSES_API_ENV} requires {OPENAI_BASE_URL_ENV}"
-            )
+            raise ValueError(f"{OPENAI_USE_RESPONSES_API_ENV} requires {OPENAI_BASE_URL_ENV}")
         return OPENAI_RESPONSES_WS_BASE_URL, True
 
     parsed = urlsplit(raw_base_url)
@@ -134,8 +132,7 @@ def _direct_openai_defaults() -> tuple[str, bool]:
         or parsed.fragment
     ):
         raise ValueError(
-            f"{OPENAI_BASE_URL_ENV} must be a credential-free HTTPS URL "
-            "without query or fragment"
+            f"{OPENAI_BASE_URL_ENV} must be a credential-free HTTPS URL without query or fragment"
         )
     if raw_responses not in {"", "true", "false"}:
         raise ValueError(f"{OPENAI_USE_RESPONSES_API_ENV} must be true or false")
