@@ -7,7 +7,10 @@ resolution-markers = [
 ]
 
 [manifest]
-overrides = [{ name = "deepagents", specifier = "==0.7.0a7" }]
+overrides = [
+    { name = "deepagents", specifier = "==0.7.0a7" },
+    { name = "setuptools", specifier = ">=83.0.0" },
+]
 
 [[package]]
 name = "aiofiles"
