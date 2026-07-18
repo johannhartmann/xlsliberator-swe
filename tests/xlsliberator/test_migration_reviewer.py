@@ -12,8 +12,8 @@ from pydantic import ValidationError
 
 from agent.xlsliberator.reviewer import (
     MIGRATION_REVIEW_TRACING_PROJECT,
-    REVIEWER_SYSTEM_PROMPT,
     REVIEW_RESULT_PATH,
+    REVIEWER_SYSTEM_PROMPT,
     HiddenAcceptanceSummary,
     LiberationReview,
     MigrationReviewerReadOnlyMiddleware,
@@ -89,6 +89,8 @@ async def test_reviewer_has_no_direct_write_access_even_to_result() -> None:
         _ok,
     )
 
+    assert isinstance(denied, ToolMessage)
+    assert isinstance(result_write, ToolMessage)
     assert denied.status == "error"
     assert "read-only implementation access" in str(denied.content)
     assert result_write.status == "error"

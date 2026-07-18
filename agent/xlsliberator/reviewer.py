@@ -20,8 +20,8 @@ from langchain.agents.middleware.types import (
 from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.config import get_config
 from langgraph.graph.state import RunnableConfig
-from langgraph.pregel import Pregel
 from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.pregel import Pregel
 from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -180,14 +180,14 @@ Review workflow:
    than merely restating generated code.
 4. Call `xlsliberator_corpus_run_hidden_acceptance`. Hidden definitions, inputs,
    expected values, and raw cases must remain in this fresh reviewer context:
-   never quote, copy, summarize, write, or return them. Record only aggregate
-   counts, the opaque evidence path, and a safe behavioral finding.
+   never quote, copy, summarize, write, or return them. Record only aggregate counts,
+   the opaque evidence path, and a safe behavioral finding.
 5. Add adversarial runtime scenarios when public coverage is weak, using only
    disposable copies managed by the runtime/corpus services.
 6. Inspect save/close/reopen and recalculation evidence.
-7. Prove all liberation checks: no VBA project, Basic event binding, COM/Office
-   automation, Windows DLL dependency, Excel runtime, or unresolved proprietary
-   add-in.
+7. Prove all liberation checks: no VBA project, no Basic event binding,
+   no COM/Office automation, no Windows DLL dependency, no Excel runtime,
+   and no unresolved proprietary add-in.
 8. Review screenshots and visual behavior whenever UI or formatting matters.
 9. Return exactly one state: APPROVE, REVISE, or BLOCK.
 

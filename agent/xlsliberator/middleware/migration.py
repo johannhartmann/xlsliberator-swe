@@ -41,7 +41,7 @@ from langgraph.runtime import Runtime
 from langgraph.types import Command
 
 from ..migrations import TASK_KIND
-from ..reviewer import MigrationReviewResult, REVIEW_RESULT_PATH
+from ..reviewer import REVIEW_RESULT_PATH, MigrationReviewResult
 
 MIGRATION_ROOT = "migration"
 DELIVERABLE_STATUS = "DELIVERABLE"
@@ -850,10 +850,7 @@ class IndependentReviewMiddleware(AgentMiddleware):
         reviewer_mutation = (
             path == f"{MIGRATION_ROOT}/reviewer"
             or path.startswith(f"{MIGRATION_ROOT}/reviewer/")
-            or (
-                name in {"execute", "shell", "bash"}
-                and f"{MIGRATION_ROOT}/reviewer" in payload
-            )
+            or (name in {"execute", "shell", "bash"} and f"{MIGRATION_ROOT}/reviewer" in payload)
         )
         if name in _MUTATING_TOOLS and reviewer_mutation:
             return _error_message(
@@ -878,7 +875,7 @@ class IndependentReviewMiddleware(AgentMiddleware):
             [
                 "set -eu",
                 f"digest=$(sha256sum {f'{MIGRATION_ROOT}/output/target.ods'!r} | cut -d' ' -f1)",
-                'printf \'artifact_sha256=%s\\n\' "$digest"',
+                "printf 'artifact_sha256=%s\\n' \"$digest\"",
                 f"cat {REVIEW_RESULT_PATH!r}",
             ]
         )
