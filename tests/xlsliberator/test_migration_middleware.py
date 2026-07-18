@@ -14,6 +14,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from agent.xlsliberator.middleware import (
     MIGRATION_MIDDLEWARE_ORDER,
     EvidenceRequiredMiddleware,
+    IndependentReviewMiddleware,
     LiberationPolicyMiddleware,
     MigrationBudget,
     MigrationBudgetMiddleware,
@@ -26,6 +27,11 @@ from agent.xlsliberator.middleware import (
     migration_middleware_stack,
 )
 from agent.xlsliberator.migrations import TASK_KIND
+from agent.xlsliberator.reviewer import (
+    HiddenAcceptanceSummary,
+    LiberationReview,
+    MigrationReviewResult,
+)
 
 
 class FakeSandbox(SandboxBackendProtocol):
@@ -245,6 +251,124 @@ async def test_evidence_gate_accepts_complete_and_blocks_missing() -> None:
     blocked = EvidenceRequiredMiddleware(backend=_resolver(missing))
     with pytest.raises(MigrationMiddlewareError, match="reviewer result"):
         await blocked.aafter_agent(
+            _terminal_state("DELIVERABLE"),
+            cast(Any, MagicMock()),
+        )
+
+
+def _review_result(
+    state: str,
+    *,
+    digest: str = "a" * 64,
+    hidden_status: str = "PASSED",
+) -> str:
+    hidden = HiddenAcceptanceSummary(
+        status=cast(Any, hidden_status),
+        executed=1,
+        passed=1 if hidden_status == "PASSED" else 0,
+        failed=0 if hidden_status == "PASSED" else 1,
+        result_evidence_path="migration/evidence/reviewer/hidden-result.json",
+    )
+    result = MigrationReviewResult(
+        state=cast(Any, state),
+        reviewer_model="reviewer:test",
+        reviewed_artifact_sha256=digest,
+        summary="Independent behavior review completed.",
+        hidden_acceptance=hidden,
+        save_reopen="PASS",
+        visual_review="NOT_REQUIRED",
+        source_behavior_tests="PASS",
+        original_sources_reviewed="PASS",
+        implementation_trace_reviewed="PASS",
+        unresolved_findings_reviewed="PASS",
+        liberation=LiberationReview(
+            no_vba_project="PASS",
+            no_basic_event_bindings="PASS",
+            no_com_office_automation="PASS",
+            no_windows_dll_dependency="PASS",
+            no_excel_runtime="PASS",
+            no_unresolved_proprietary_addin="PASS",
+        ),
+        evidence_paths=["migration/evidence/reviewer/summary.json"],
+    )
+    return result.model_dump_json()
+
+
+@pytest.mark.asyncio
+async def test_implementation_cannot_forge_reviewer_result() -> None:
+    middleware = IndependentReviewMiddleware(backend=_resolver(FakeSandbox()))
+    called = False
+
+    async def handler(request: ToolCallRequest) -> ToolMessage:
+        nonlocal called
+        called = True
+        return await _ok_tool(request)
+
+    result = await middleware.awrap_tool_call(
+        _tool_request(
+            "write_file",
+            {
+                "file_path": "migration/reviewer/result.json",
+                "content": '{"state":"APPROVE"}',
+            },
+        ),
+        handler,
+    )
+
+    assert called is False
+    assert isinstance(result, ToolMessage)
+    assert result.status == "error"
+    assert "request_independent_migration_review" in str(result.content)
+
+
+@pytest.mark.asyncio
+async def test_independent_approve_is_bound_to_current_artifact_digest() -> None:
+    digest = "a" * 64
+    backend = FakeSandbox(
+        lambda _command: ExecuteResponse(
+            output=f"artifact_sha256={digest}\n{_review_result('APPROVE', digest=digest)}",
+            exit_code=0,
+        )
+    )
+    middleware = IndependentReviewMiddleware(backend=_resolver(backend))
+
+    assert (
+        await middleware.aafter_agent(
+            _terminal_state("DELIVERABLE"),
+            cast(Any, MagicMock()),
+        )
+        is None
+    )
+
+    stale = FakeSandbox(
+        lambda _command: ExecuteResponse(
+            output=f"artifact_sha256={'b' * 64}\n{_review_result('APPROVE', digest=digest)}",
+            exit_code=0,
+        )
+    )
+    with pytest.raises(MigrationMiddlewareError, match="changed after independent review"):
+        await IndependentReviewMiddleware(backend=_resolver(stale)).aafter_agent(
+            _terminal_state("DELIVERABLE"),
+            cast(Any, MagicMock()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_hidden_boundary_failure_blocks_publicly_plausible_migration_end_to_end() -> None:
+    """A public-suite pass cannot bypass a failing hidden boundary case."""
+    digest = "c" * 64
+    backend = FakeSandbox(
+        lambda _command: ExecuteResponse(
+            output=(
+                f"artifact_sha256={digest}\n"
+                f"{_review_result('REVISE', digest=digest, hidden_status='FAILED')}"
+            ),
+            exit_code=0,
+        )
+    )
+
+    with pytest.raises(MigrationMiddlewareError, match="returned REVISE"):
+        await IndependentReviewMiddleware(backend=_resolver(backend)).aafter_agent(
             _terminal_state("DELIVERABLE"),
             cast(Any, MagicMock()),
         )

@@ -12,8 +12,9 @@ The fixed order is:
 4. `MigrationBudgetMiddleware`
 5. `MigrationCheckpointMiddleware`
 6. `RegressionPromotionMiddleware`
-7. `NoFakeSuccessMiddleware`
-8. `EvidenceRequiredMiddleware`
+7. `IndependentReviewMiddleware`
+8. `NoFakeSuccessMiddleware`
+9. `EvidenceRequiredMiddleware`
 
 Workbook-derived text is always untrusted data. It cannot change service
 authorization, tool policy, credentials, approvals, or evidence gates. The
@@ -33,9 +34,16 @@ A migration must end with exactly one explicit marker:
   unresolved list, and independent reviewer result. The runtime service must
   report `AVAILABLE`, and evidence cannot describe required operations as
   skipped, unavailable, unimplemented, timed out, transport-only, or missing.
+  The reviewer result must be `APPROVE` and its SHA-256 must match the current
+  target ODS; changing the candidate invalidates the approval.
 - `XLSLIBERATOR_STATUS: UNRESOLVED` requires a non-empty
   `migration/unresolved.md`. Budget exhaustion writes this result instead of
-  manufacturing success.
+manufacturing success.
+
+Implementation agents cannot write `migration/reviewer/`. They invoke
+`request_independent_migration_review`, which creates a fresh reviewer model
+context with hidden corpus access and read-only implementation access. Only
+the reviewer's validated submission tool may persist the structured result.
 
 If a migration changes generic XLSLiberator or LibreOffice implementation code,
 delivery additionally requires a minimized fixture, fail-before/pass-after

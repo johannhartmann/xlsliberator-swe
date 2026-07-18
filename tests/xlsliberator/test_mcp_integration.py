@@ -221,6 +221,25 @@ async def test_hidden_tool_is_reviewer_only_and_never_in_implementation_union() 
 
 
 @pytest.mark.asyncio
+async def test_reviewer_runtime_can_mutate_disposable_session_but_not_save_candidate() -> None:
+    async def runtime_loader(config: MCPServiceConfig) -> list[BaseTool]:
+        del config
+        return [_tool("write_cells"), _tool("dispatch_control_event"), _tool("save")]
+
+    registry = await load_migration_mcp_registry(
+        _settings(runtime="http://runtime:8000/mcp"),
+        env={},
+        include_hidden=True,
+        loader=runtime_loader,
+    )
+    reviewer_names = {tool.name for tool in registry.tools_for_role("reviewer")}
+
+    assert "xlsliberator_runtime_write_cells" in reviewer_names
+    assert "xlsliberator_runtime_dispatch_control_event" in reviewer_names
+    assert "xlsliberator_runtime_save" not in reviewer_names
+
+
+@pytest.mark.asyncio
 async def test_build_farm_tools_require_repair_flow_authority() -> None:
     async def build_loader(config: MCPServiceConfig) -> list[BaseTool]:
         del config

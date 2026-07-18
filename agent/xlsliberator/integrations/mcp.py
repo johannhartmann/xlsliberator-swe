@@ -77,6 +77,28 @@ BUILD_FARM_TOOLS = frozenset(
         "collect_build_logs",
     }
 )
+REVIEWER_RUNTIME_TOOLS = frozenset(
+    {
+        "create_session",
+        "open_document",
+        "inspect_document",
+        "list_sheets",
+        "read_cells",
+        "write_cells",
+        "list_formulas",
+        "recalculate",
+        "list_controls",
+        "dispatch_control_event",
+        "send_keyboard_event",
+        "execute_python_macro",
+        "capture_screenshot",
+        "export_pdf",
+        "close",
+        "reopen",
+        "collect_logs",
+        "destroy_session",
+    }
+)
 
 ROLE_ALLOWLISTS: Mapping[str, Mapping[ServiceName, frozenset[str]]] = {
     "lead": {
@@ -214,7 +236,7 @@ ROLE_ALLOWLISTS: Mapping[str, Mapping[ServiceName, frozenset[str]]] = {
         "buildfarm": frozenset(),
     },
     "reviewer": {
-        "runtime": RUNTIME_TOOLS,
+        "runtime": REVIEWER_RUNTIME_TOOLS,
         "corpus": CORPUS_PUBLIC_TOOLS | CORPUS_HIDDEN_TOOLS,
         "buildfarm": frozenset(),
     },

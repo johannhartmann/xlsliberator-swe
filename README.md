@@ -45,6 +45,8 @@ See [XLSLiberator MCP configuration](docs/XLSLIBERATOR_MCP.md) for the local
 Docker, production TLS, role allowlist, hidden-test, and build-farm boundaries.
 See [XLSLiberator migration middleware](docs/XLSLIBERATOR_MIDDLEWARE.md) for
 checkpoint, evidence, anti-fake-success, policy, and budget gates.
+See [XLSLiberator independent migration reviewer](docs/XLSLIBERATOR_REVIEWER.md)
+for the fresh-context hidden-test and artifact-digest approval gate.
 
 ---
 

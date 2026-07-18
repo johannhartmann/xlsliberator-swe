@@ -5,6 +5,7 @@
   "graphs": {
     "agent": "agent.graphs.agent:traced_agent",
     "reviewer": "agent.graphs.reviewer:traced_reviewer_agent",
+    "migration_reviewer": "agent.graphs.migration_reviewer:traced_migration_reviewer",
     "analyzer": "agent.graphs.analyzer:traced_analyzer",
     "chat": "agent.graphs.chat:traced_chat_agent",
     "scheduler": "agent.graphs.scheduler:get_scheduler"

@@ -3,6 +3,7 @@
 from .migration import (
     MIGRATION_MIDDLEWARE_ORDER,
     EvidenceRequiredMiddleware,
+    IndependentReviewMiddleware,
     LiberationPolicyMiddleware,
     MigrationBudget,
     MigrationBudgetMiddleware,
@@ -19,6 +20,7 @@ from .workbook_attachment import WorkbookAttachmentMiddleware, WorkbookAttachmen
 __all__ = [
     "MIGRATION_MIDDLEWARE_ORDER",
     "EvidenceRequiredMiddleware",
+    "IndependentReviewMiddleware",
     "LiberationPolicyMiddleware",
     "MigrationBudget",
     "MigrationBudgetMiddleware",

@@ -9,12 +9,13 @@ mutation policy and budgets to persistence and terminal gates:
 4. MigrationBudgetMiddleware
 5. MigrationCheckpointMiddleware
 6. RegressionPromotionMiddleware
-7. NoFakeSuccessMiddleware
-8. EvidenceRequiredMiddleware
+7. IndependentReviewMiddleware
+8. NoFakeSuccessMiddleware
+9. EvidenceRequiredMiddleware
 
-LangChain executes ``after_agent`` hooks in reverse nesting order.  The two
-terminal gates are therefore adjacent and independent: neither can transform a
-failed or incomplete run into a successful one.
+LangChain executes ``after_agent`` hooks in reverse nesting order. The terminal
+gates remain independent: none can transform a failed or incomplete run into a
+successful one.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from langgraph.runtime import Runtime
 from langgraph.types import Command
 
 from ..migrations import TASK_KIND
+from ..reviewer import MigrationReviewResult, REVIEW_RESULT_PATH
 
 MIGRATION_ROOT = "migration"
 DELIVERABLE_STATUS = "DELIVERABLE"
@@ -72,6 +74,7 @@ MIGRATION_MIDDLEWARE_ORDER = (
     "MigrationBudgetMiddleware",
     "MigrationCheckpointMiddleware",
     "RegressionPromotionMiddleware",
+    "IndependentReviewMiddleware",
     "NoFakeSuccessMiddleware",
     "EvidenceRequiredMiddleware",
 )
@@ -289,7 +292,7 @@ def _target_path(args: Mapping[str, Any]) -> str:
     for key in ("file_path", "path", "target_file"):
         value = args.get(key)
         if isinstance(value, str):
-            return value.strip().lstrip("./")
+            return value.strip().removeprefix("/workspace/").lstrip("./")
     return ""
 
 
@@ -828,6 +831,82 @@ class RegressionPromotionMiddleware(AgentMiddleware):
         return None
 
 
+class IndependentReviewMiddleware(AgentMiddleware):
+    """Protect reviewer ownership and require current APPROVE evidence."""
+
+    state_schema = MigrationMiddlewareState
+
+    def __init__(self, *, backend: BackendResolver) -> None:
+        self._backend = backend
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolResult]],
+    ) -> ToolResult:
+        name, args, call_id = _tool_call(request)
+        path = _target_path(args)
+        payload = _added_payload(args)
+        reviewer_mutation = (
+            path == f"{MIGRATION_ROOT}/reviewer"
+            or path.startswith(f"{MIGRATION_ROOT}/reviewer/")
+            or (
+                name in {"execute", "shell", "bash"}
+                and f"{MIGRATION_ROOT}/reviewer" in payload
+            )
+        )
+        if name in _MUTATING_TOOLS and reviewer_mutation:
+            return _error_message(
+                call_id,
+                guard=type(self).__name__,
+                error="implementation agents cannot create or edit independent reviewer evidence",
+                remediation=(
+                    "Call request_independent_migration_review. Only its fresh reviewer "
+                    f"context may write {REVIEW_RESULT_PATH}."
+                ),
+            )
+        return await handler(request)
+
+    async def aafter_agent(
+        self,
+        state: AgentState,
+        runtime: Runtime,
+    ) -> dict[str, Any] | None:
+        if _terminal_status(state) != DELIVERABLE_STATUS:
+            return None
+        command = "\n".join(
+            [
+                "set -eu",
+                f"digest=$(sha256sum {f'{MIGRATION_ROOT}/output/target.ods'!r} | cut -d' ' -f1)",
+                'printf \'artifact_sha256=%s\\n\' "$digest"',
+                f"cat {REVIEW_RESULT_PATH!r}",
+            ]
+        )
+        try:
+            output = await _run(self._backend, runtime, command)
+            first_line, separator, payload = output.partition("\n")
+            if not separator or not first_line.startswith("artifact_sha256="):
+                raise ValueError("review artifact digest is missing")
+            current_digest = first_line.removeprefix("artifact_sha256=").strip()
+            result = MigrationReviewResult.model_validate_json(payload)
+        except (MigrationMiddlewareError, ValueError) as exc:
+            raise MigrationMiddlewareError(
+                "Cannot deliver: independent reviewer evidence is missing or malformed. "
+                "Call request_independent_migration_review and resolve its findings."
+            ) from exc
+        if result.reviewed_artifact_sha256 != current_digest:
+            raise MigrationMiddlewareError(
+                "Cannot deliver: the candidate changed after independent review. "
+                "Run request_independent_migration_review again for the current target."
+            )
+        if result.state != "APPROVE":
+            raise MigrationMiddlewareError(
+                f"Cannot deliver: independent reviewer returned {result.state}. "
+                "Repair or explicitly record the blocker, then rerun review."
+            )
+        return None
+
+
 class NoFakeSuccessMiddleware(AgentMiddleware):
     """Reject deliverable claims contradicted by service or evidence state."""
 
@@ -936,6 +1015,7 @@ def migration_middleware_stack(
         MigrationBudgetMiddleware(backend=backend, budget=budget),
         MigrationCheckpointMiddleware(backend=backend),
         RegressionPromotionMiddleware(backend=backend),
+        IndependentReviewMiddleware(backend=backend),
         NoFakeSuccessMiddleware(
             backend=backend,
             service_health=service_health,

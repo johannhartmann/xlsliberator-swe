@@ -163,6 +163,7 @@ from .xlsliberator.middleware import (
 )
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.prompt import prompt_for_task
+from .xlsliberator.reviewer import request_independent_migration_review
 from .xlsliberator.settings import XLSLiberatorSettings
 from .xlsliberator.skills import MigrationSkillsMiddleware
 from .xlsliberator.subagents import subagents_for_task_kind
@@ -1026,6 +1027,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         if migration_mcp_registry is not None
         else []
     )
+    migration_review_tools = [request_independent_migration_review] if is_migration else []
     migration_subagents = subagents_for_task_kind(
         configurable.get("task_kind"),
         model=subagent_model,
@@ -1062,6 +1064,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
             *currents_tools,
             *notion_tools,
             *migration_lead_tools,
+            *migration_review_tools,
         ],
         subagents=[
             _general_purpose_subagent(subagent_model),
