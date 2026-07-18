@@ -42,15 +42,9 @@ def test_settings_have_deterministic_fork_defaults() -> None:
     assert settings.sandbox_memory_bytes == DEFAULT_SANDBOX_MEMORY_BYTES
     assert settings.sandbox_disk_bytes == DEFAULT_SANDBOX_DISK_BYTES
     assert settings.sandbox_pids_limit == DEFAULT_SANDBOX_PIDS_LIMIT
-    assert (
-        settings.sandbox_command_timeout_seconds
-        == DEFAULT_SANDBOX_COMMAND_TIMEOUT_SECONDS
-    )
+    assert settings.sandbox_command_timeout_seconds == DEFAULT_SANDBOX_COMMAND_TIMEOUT_SECONDS
     assert settings.sandbox_idle_ttl_seconds == DEFAULT_SANDBOX_IDLE_TTL_SECONDS
-    assert (
-        settings.sandbox_delete_after_stop_seconds
-        == DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS
-    )
+    assert settings.sandbox_delete_after_stop_seconds == DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS
 
 
 def test_settings_accept_deployment_overrides() -> None:
@@ -112,9 +106,7 @@ def test_environment_defaults_do_not_replace_explicit_values() -> None:
         "DEFAULT_SANDBOX_VCPUS": str(DEFAULT_SANDBOX_CPU_COUNT),
         "DEFAULT_SANDBOX_MEM_BYTES": str(DEFAULT_SANDBOX_MEMORY_BYTES),
         "DEFAULT_SANDBOX_IDLE_TTL_SECONDS": str(DEFAULT_SANDBOX_IDLE_TTL_SECONDS),
-        "DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS": str(
-            DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS
-        ),
+        "DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS": str(DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS),
     }
 
 
@@ -130,9 +122,7 @@ def test_environment_defaults_select_xlsliberator_repository() -> None:
         "DEFAULT_SANDBOX_VCPUS": str(DEFAULT_SANDBOX_CPU_COUNT),
         "DEFAULT_SANDBOX_MEM_BYTES": str(DEFAULT_SANDBOX_MEMORY_BYTES),
         "DEFAULT_SANDBOX_IDLE_TTL_SECONDS": str(DEFAULT_SANDBOX_IDLE_TTL_SECONDS),
-        "DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS": str(
-            DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS
-        ),
+        "DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS": str(DEFAULT_SANDBOX_DELETE_AFTER_STOP_SECONDS),
     }
 
 

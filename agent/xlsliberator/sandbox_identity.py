@@ -36,9 +36,7 @@ def parse_identity_output(output: object) -> dict[str, Any] | None:
         "xlsliberator_commit",
         "libreoffice_build",
     }
-    if not required.issubset(image) or not all(
-        isinstance(image[key], str) for key in required
-    ):
+    if not required.issubset(image) or not all(isinstance(image[key], str) for key in required):
         return None
     return payload
 
@@ -72,7 +70,9 @@ async def record_sandbox_identity(
     """Persist an image/snapshot tuple in thread metadata on every agent run."""
 
     if os.getenv("SANDBOX_TYPE", "langsmith") == "local":
-        logger.warning("Skipping image identity for unisolated local sandbox %s", sandbox_backend.id)
+        logger.warning(
+            "Skipping image identity for unisolated local sandbox %s", sandbox_backend.id
+        )
         return
     try:
         payload = await capture_sandbox_identity(sandbox_backend)
