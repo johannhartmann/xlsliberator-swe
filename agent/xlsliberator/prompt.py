@@ -184,7 +184,7 @@ def trajectory_for(features: Iterable[MigrationFeature]) -> tuple[str, ...]:
         names = ", ".join(sorted(unknown))
         raise ValueError(f"unsupported migration features: {names}")
 
-    requirements = list(MIGRATION_LEAD_STAGES)
+    requirements: list[str] = list(MIGRATION_LEAD_STAGES)
     for feature in _FEATURE_ORDER:
         if feature in selected:
             requirements.extend(FEATURE_TRAJECTORY_REQUIREMENTS[feature])

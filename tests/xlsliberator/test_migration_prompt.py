@@ -107,11 +107,7 @@ def test_unknown_trajectory_feature_is_rejected() -> None:
 
 def test_golden_directory_manifest_matches_prompt_policy() -> None:
     manifest_path = (
-        Path(__file__).parents[2]
-        / "agent"
-        / "xlsliberator"
-        / "golden_migration"
-        / "structure.json"
+        Path(__file__).parents[2] / "agent" / "xlsliberator" / "golden_migration" / "structure.json"
     )
     manifest = json.loads(manifest_path.read_text())
 
