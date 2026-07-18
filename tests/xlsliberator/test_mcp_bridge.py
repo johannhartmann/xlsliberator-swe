@@ -201,26 +201,48 @@ async def test_failed_open_removes_private_document_copy(tmp_path: Path) -> None
 
 @pytest.mark.asyncio
 async def test_session_save_returns_output_to_same_private_sandbox(tmp_path: Path) -> None:
+    async def open_document(session_id: str, document_path: str) -> dict[str, Any]:
+        assert session_id == "runtime-session"
+        assert Path(document_path).read_bytes() == b"source-ods"
+        return _success(session_id=session_id)
+
     async def save(session_id: str, output_path: str | None = None) -> dict[str, Any]:
         assert session_id == "runtime-session"
         assert output_path is not None
         Path(output_path).write_bytes(b"saved-ods")
         return _success(session_id=session_id)
 
-    tool = StructuredTool.from_function(
+    open_tool = StructuredTool.from_function(
+        coroutine=open_document,
+        name="open_document",
+        description="Open target.",
+    )
+    save_tool = StructuredTool.from_function(
         coroutine=save,
         name="save",
         description="Save target.",
     )
-    backend = _Backend({})
-    registry = bridge_migration_mcp_registry(
-        _registry("save", tool),
+    backend = _Backend({"/workspace/migration/output/target.ods": b"source-ods"})
+    open_registry = bridge_migration_mcp_registry(
+        _registry("open_document", open_tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+    save_registry = bridge_migration_mcp_registry(
+        _registry("save", save_tool),
         backend=lambda: cast(SandboxBackendProtocol, backend),
         thread_id="private-thread",
         bridge_root=str(tmp_path),
     )
 
-    result = await registry.curated[0].tool.ainvoke(
+    await open_registry.curated[0].tool.ainvoke(
+        {
+            "session_id": "runtime-session",
+            "document_path": "/workspace/migration/output/target.ods",
+        }
+    )
+    result = await save_registry.curated[0].tool.ainvoke(
         {
             "session_id": "runtime-session",
             "output_path": "/workspace/migration/evidence/saved.ods",
