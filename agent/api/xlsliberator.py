@@ -7,10 +7,13 @@ import hmac
 import mimetypes
 import os
 import re
+import stat as stat_module
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
 from pathlib import PurePosixPath
 from typing import Any
+from zipfile import BadZipFile, ZipFile
 
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import Response
@@ -42,6 +45,8 @@ router = APIRouter(prefix="/api/xlsliberator/migrations", tags=["xlsliberator"])
 _AUTHORIZATION_HEADER = Header(default=None)
 _OWNER_HEADER = Header(default=None, alias="X-XLSLiberator-Owner")
 _MAX_PUBLIC_ARTIFACT_BYTES = 64 * 1024 * 1024
+_MAX_PUBLIC_ARCHIVE_FILES = 500
+_MAX_PUBLIC_ARCHIVE_BYTES = 256 * 1024 * 1024
 _PUBLIC_TEXT_SUFFIXES = frozenset(
     {".json", ".log", ".md", ".py", ".pyi", ".service", ".toml", ".txt", ".yaml", ".yml"}
 )
@@ -323,6 +328,61 @@ def _download_content(response: object) -> bytes | None:
     return content if isinstance(content, bytes) and not error else None
 
 
+def _validate_public_archive(content: bytes) -> None:
+    """Reject unsafe archives and scan every expanded member before publication."""
+    try:
+        with ZipFile(BytesIO(content)) as archive:
+            members = archive.infolist()
+            if (
+                not members
+                or not any(not member.is_dir() for member in members)
+                or len(members) > _MAX_PUBLIC_ARCHIVE_FILES
+            ):
+                raise ValueError("archive file count is invalid")
+            names: set[str] = set()
+            expanded_bytes = 0
+            for member in members:
+                path = PurePosixPath(member.filename)
+                normalized = path.as_posix().rstrip("/")
+                if (
+                    not normalized
+                    or path.is_absolute()
+                    or ".." in path.parts
+                    or "." in path.parts
+                    or "\\" in member.filename
+                    or normalized != member.filename.rstrip("/")
+                    or len(normalized) > 500
+                    or len(path.parts) > 20
+                ):
+                    raise ValueError("archive member path is unsafe")
+                if normalized in names:
+                    raise ValueError("archive member path is duplicated")
+                names.add(normalized)
+                if stat_module.S_ISLNK(member.external_attr >> 16):
+                    raise ValueError("archive contains a symbolic link")
+                if member.flag_bits & 0x1:
+                    raise ValueError("archive contains encrypted content")
+                if member.file_size > _MAX_PUBLIC_ARTIFACT_BYTES:
+                    raise ValueError("archive member is oversized")
+                if member.is_dir():
+                    continue
+                expanded_bytes += member.file_size
+                if expanded_bytes > _MAX_PUBLIC_ARCHIVE_BYTES:
+                    raise ValueError("archive expands beyond its publication limit")
+                payload = archive.read(member)
+                if (
+                    _SENSITIVE_CONTENT.search(payload)
+                    or _PRIVATE_CONTENT.search(payload)
+                    or _INTERNAL_PATH.search(payload)
+                ):
+                    raise ValueError("archive member failed publication checks")
+    except (BadZipFile, NotImplementedError, OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "artifact archive failed publication checks",
+        ) from exc
+
+
 async def _artifact_bytes(thread_id: str, artifact: _PublicArtifact) -> bytes:
     backend = await _migration_backend(thread_id)
     responses = await backend.adownload_files([f"/workspace/migration/{artifact.relative_path}"])
@@ -334,6 +394,8 @@ async def _artifact_bytes(thread_id: str, artifact: _PublicArtifact) -> bytes:
     suffix = PurePosixPath(artifact.relative_path).suffix.lower()
     if _SENSITIVE_CONTENT.search(content) or _PRIVATE_CONTENT.search(content):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "artifact failed publication checks")
+    if suffix == ".zip":
+        _validate_public_archive(content)
     if _INTERNAL_PATH.search(content):
         if suffix not in _PUBLIC_TEXT_SUFFIXES:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "artifact failed publication checks")

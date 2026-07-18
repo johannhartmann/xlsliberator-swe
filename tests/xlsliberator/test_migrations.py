@@ -447,6 +447,67 @@ async def test_publication_check_blocks_credentials(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("member_name", "payload"),
+    [
+        ("evidence/result.json", b'{"hidden test":"do not publish"}'),
+        ("logs/runtime.log", b"Authorization: Bearer secret-token"),
+        ("evidence/operations.json", b'{"path":"/workspace/migration/output/target.ods"}'),
+        ("../escape.txt", b"unsafe"),
+    ],
+)
+async def test_publication_check_scans_expanded_archive_members(
+    monkeypatch: pytest.MonkeyPatch,
+    member_name: str,
+    payload: bytes,
+) -> None:
+    backend = _DeliveryBackend()
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(member_name, payload)
+    backend.files["generated/public-showcase.zip"] = output.getvalue()
+
+    async def delivery_backend(_thread_id: str) -> _DeliveryBackend:
+        return backend
+
+    monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
+    artifact = next(
+        candidate
+        for candidate in await migration_api._public_artifacts("thread-1")
+        if candidate.summary.name == "public-showcase.zip"
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await migration_api._artifact_bytes("thread-1", artifact)
+
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_publication_check_preserves_safe_archive_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _DeliveryBackend()
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("evidence/result.json", b'{"status":"PASSED"}')
+    expected = output.getvalue()
+    backend.files["generated/public-showcase.zip"] = expected
+
+    async def delivery_backend(_thread_id: str) -> _DeliveryBackend:
+        return backend
+
+    monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
+    artifact = next(
+        candidate
+        for candidate in await migration_api._public_artifacts("thread-1")
+        if candidate.summary.name == "public-showcase.zip"
+    )
+
+    assert await migration_api._artifact_bytes("thread-1", artifact) == expected
+
+
+@pytest.mark.asyncio
 async def test_publication_redacts_internal_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
