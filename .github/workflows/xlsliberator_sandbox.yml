@@ -126,21 +126,22 @@ jobs:
             --cpus 2 \
             --volume "$PWD:/source:ro" \
             --tmpfs /workspace:rw,nosuid,nodev,size=512m,uid=10001,gid=10001,mode=0700 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=1777 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=1777 \
             --tmpfs /home/sandbox:rw,nosuid,nodev,size=1g,uid=10001,gid=10001,mode=0700 \
             --env UV_CACHE_DIR=/home/sandbox/.cache/uv \
             "${SANDBOX_IMAGE}" \
             sh -ec '
               cd /source
-              uv venv --python /usr/local/bin/python3.12 /workspace/audit-venv
               uv pip install \
-                --python /workspace/audit-venv/bin/python \
+                --target /workspace/audit-tools \
                 bandit==1.8.6 pip-audit==2.9.0
-              /workspace/audit-venv/bin/bandit \
+              PYTHONPATH=/workspace/audit-tools \
+                /usr/local/bin/python3.12 -m bandit \
                 -q -ll -ii -r agent/xlsliberator
               uv export --locked --no-dev --no-emit-project \
                 --format requirements-txt --output-file /workspace/requirements.txt
-              /workspace/audit-venv/bin/pip-audit \
+              PYTHONPATH=/workspace/audit-tools \
+                /usr/local/bin/python3.12 -m pip_audit \
                 --requirement /workspace/requirements.txt \
                 --disable-pip \
                 --progress-spinner off
