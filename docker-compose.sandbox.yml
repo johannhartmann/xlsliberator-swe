@@ -3,6 +3,7 @@ name: xlsliberator-open-swe
 services:
   sandbox:
     image: ${XLSLIBERATOR_SANDBOX_IMAGE:-ghcr.io/johannhartmann/xlsliberator-swe-sandbox:2026.07.0}
+    command: ["sleep", "infinity"]
     build:
       context: .
       dockerfile: docker/xlsliberator-sandbox/Dockerfile
@@ -28,6 +29,14 @@ services:
     storage_opt:
       size: 32G
     stop_grace_period: 30s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -w /workspace && xlsliberator-sandbox-identity >/dev/null
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     environment:
       XLSLIBERATOR_JOB_WORKSPACE: /workspace
       XLSLIBERATOR_SANDBOX_COMMAND_TIMEOUT_SECONDS: "1800"

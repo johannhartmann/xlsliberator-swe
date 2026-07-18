@@ -156,6 +156,17 @@ and must pass the same smoke command. If a provider cannot preserve the pinned
 LibreOffice/PyUNO image or resource limits, workbook migration is unavailable
 on that provider.
 
+For a Docker-hosted Open SWE deployment, use `SANDBOX_TYPE=docker`. The trusted
+application container may access the Docker socket solely to create and control
+per-thread child containers. The child receives neither that socket nor host
+credentials. The provider resolves the configured image to its immutable image
+ID, verifies the Open SWE and XLSLiberator commit labels plus LibreOffice
+`26.2.4.2`, and rejects a reconnect unless the container still has the exact
+image and security policy. Every child has no network, a read-only root
+filesystem, all capabilities dropped, `no-new-privileges`, explicit CPU,
+memory, PID, command-time and tmpfs workspace limits, and only the safe runtime
+environment declared by the provider.
+
 `SANDBOX_TYPE=local` is not an isolated sandbox: it runs commands directly in
 the server's environment. It is unsuitable for workbook migration and never
 authorizes local Python, UNO, PyUNO, LibreOffice, or `soffice`. The

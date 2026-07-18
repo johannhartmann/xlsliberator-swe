@@ -40,6 +40,29 @@ class TestSandboxFactoryLoading:
         mock_import_module.assert_called_once_with("agent.integrations.local")
         module.create_local_sandbox.assert_called_once_with("existing")
 
+    async def test_create_sandbox_loads_docker_provider_off_event_loop(self) -> None:
+        with (
+            patch("agent.utils.sandbox.import_module") as mock_import_module,
+            patch("agent.utils.sandbox.asyncio.to_thread", new_callable=AsyncMock) as to_thread,
+            patch.dict("os.environ", {"SANDBOX_TYPE": "docker"}),
+        ):
+            module = MagicMock()
+            module.create_docker_sandbox = MagicMock()
+            mock_import_module.return_value = module
+            expected = MagicMock(id="xlsliberator-swe-aaaaaaaaaaaaaaaaaaaaaaaa")
+            to_thread.return_value = expected
+
+            from agent.utils.sandbox import create_sandbox
+
+            sandbox = await create_sandbox("xlsliberator-swe-aaaaaaaaaaaaaaaaaaaaaaaa")
+
+        assert sandbox is expected
+        mock_import_module.assert_called_once_with("agent.integrations.docker")
+        to_thread.assert_awaited_once_with(
+            module.create_docker_sandbox,
+            "xlsliberator-swe-aaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+
 
 class TestConfigureGithubProxy:
     """Tests for _configure_github_proxy payload shape and error handling."""
