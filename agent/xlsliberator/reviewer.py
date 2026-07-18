@@ -42,6 +42,7 @@ from ..runtime import (
 from ..utils.model import DEFAULT_LLM_REASONING, make_model, provider_model_kwargs
 from ..utils.tracing import traced_graph_factory
 from .integrations.mcp import load_migration_mcp_registry
+from .integrations.mcp_bridge import bridge_migration_mcp_registry
 from .migrations import TASK_KIND
 from .settings import XLSLiberatorSettings
 
@@ -342,6 +343,12 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
         raise RuntimeError("migration reviewer requires an executable source sandbox")
     settings = XLSLiberatorSettings.from_env()
     registry = await load_migration_mcp_registry(settings, include_hidden=True)
+    registry = bridge_migration_mcp_registry(
+        registry,
+        backend=lambda: backend,
+        thread_id=source_thread_id,
+        bridge_root=settings.mcp_bridge_root,
+    )
     reviewer_tools = registry.tools_for_role("reviewer")
     hidden_name = "xlsliberator_corpus_run_hidden_acceptance"
     if hidden_name not in {tool.name for tool in reviewer_tools}:

@@ -86,6 +86,7 @@ class XLSLiberatorSettings:
     libreoffice_mcp_endpoint: str | None
     corpus_mcp_endpoint: str | None
     build_farm_mcp_endpoint: str | None
+    mcp_bridge_root: str | None
     primary_model: str
     reviewer_model: str
     specialist_model: str
@@ -130,6 +131,10 @@ class XLSLiberatorSettings:
             build_farm_mcp_endpoint=_optional_value(
                 source,
                 "XLSLIBERATOR_BUILD_FARM_MCP_ENDPOINT",
+            ),
+            mcp_bridge_root=_optional_value(
+                source,
+                "XLSLIBERATOR_MCP_BRIDGE_ROOT",
             ),
             primary_model=_value(
                 source,

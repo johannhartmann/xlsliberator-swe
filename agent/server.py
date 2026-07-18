@@ -158,6 +158,7 @@ from .xlsliberator.integrations.mcp import (
     MigrationMCPRegistry,
     load_migration_mcp_registry,
 )
+from .xlsliberator.integrations.mcp_bridge import bridge_migration_mcp_registry
 from .xlsliberator.middleware import (
     WorkbookAttachmentMiddleware,
     migration_middleware_stack,
@@ -978,6 +979,12 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     if is_migration:
         migration_settings = XLSLiberatorSettings.from_env()
         migration_mcp_registry = await load_migration_mcp_registry(migration_settings)
+        migration_mcp_registry = bridge_migration_mcp_registry(
+            migration_mcp_registry,
+            backend=lambda: backend_factory(None),
+            thread_id=thread_id,
+            bridge_root=migration_settings.mcp_bridge_root,
+        )
         migration_evaluation_middleware.append(MigrationEvaluationTraceMiddleware(model_id))
         migration_skills_middleware.append(
             MigrationSkillsMiddleware(

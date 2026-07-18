@@ -35,6 +35,7 @@ def test_settings_have_deterministic_fork_defaults() -> None:
     assert settings.libreoffice_mcp_endpoint is None
     assert settings.corpus_mcp_endpoint is None
     assert settings.build_farm_mcp_endpoint is None
+    assert settings.mcp_bridge_root is None
     assert settings.primary_model == DEFAULT_PRIMARY_MODEL
     assert settings.reviewer_model == DEFAULT_REVIEWER_MODEL
     assert settings.specialist_model == DEFAULT_SPECIALIST_MODEL
@@ -63,6 +64,7 @@ def test_settings_accept_deployment_overrides() -> None:
             "XLSLIBERATOR_LIBREOFFICE_MCP_ENDPOINT": "http://office:8000/mcp",
             "XLSLIBERATOR_CORPUS_MCP_ENDPOINT": "http://corpus:8000/mcp",
             "XLSLIBERATOR_BUILD_FARM_MCP_ENDPOINT": "http://build-farm:8000/mcp",
+            "XLSLIBERATOR_MCP_BRIDGE_ROOT": "/srv/private/xlsliberator-bridge",
             "XLSLIBERATOR_PRIMARY_MODEL": "primary:model",
             "XLSLIBERATOR_REVIEWER_MODEL": "reviewer:model",
             "XLSLIBERATOR_SPECIALIST_MODEL": "specialist:model",
@@ -91,6 +93,7 @@ def test_settings_accept_deployment_overrides() -> None:
     assert settings.libreoffice_mcp_endpoint == "http://office:8000/mcp"
     assert settings.corpus_mcp_endpoint == "http://corpus:8000/mcp"
     assert settings.build_farm_mcp_endpoint == "http://build-farm:8000/mcp"
+    assert settings.mcp_bridge_root == "/srv/private/xlsliberator-bridge"
     assert settings.primary_model == "primary:model"
     assert settings.reviewer_model == "reviewer:model"
     assert settings.specialist_model == "specialist:model"

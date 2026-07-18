@@ -1,0 +1,232 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+from deepagents.backends.protocol import (
+    FileDownloadResponse,
+    FileUploadResponse,
+    SandboxBackendProtocol,
+)
+from langchain_core.tools import StructuredTool
+
+from agent.xlsliberator.integrations.mcp import (
+    CuratedTool,
+    MCPServiceHealth,
+    MigrationMCPRegistry,
+)
+from agent.xlsliberator.integrations.mcp_bridge import (
+    MCPBridgeError,
+    bridge_migration_mcp_registry,
+)
+
+
+class _Backend:
+    def __init__(self, files: dict[str, bytes]) -> None:
+        self.files = files
+        self.downloads: list[str] = []
+        self.uploads: list[str] = []
+
+    async def adownload_files(self, paths: list[str]) -> list[FileDownloadResponse]:
+        self.downloads.extend(paths)
+        return [
+            FileDownloadResponse(
+                path=path,
+                content=self.files.get(path),
+                error=None if path in self.files else "file_not_found",
+            )
+            for path in paths
+        ]
+
+    async def aupload_files(
+        self,
+        files: list[tuple[str, bytes]],
+    ) -> list[FileUploadResponse]:
+        for path, content in files:
+            self.files[path] = content
+            self.uploads.append(path)
+        return [FileUploadResponse(path=path) for path, _content in files]
+
+
+def _registry(name: str, tool: StructuredTool) -> MigrationMCPRegistry:
+    return MigrationMCPRegistry(
+        (
+            CuratedTool(
+                service="runtime",
+                original_name=name,
+                tool=tool.model_copy(update={"name": f"xlsliberator_runtime_{name}"}),
+            ),
+        ),
+        {"runtime": MCPServiceHealth("AVAILABLE", "runtime")},
+    )
+
+
+def _success(**extra: Any) -> dict[str, Any]:
+    return {
+        "success": True,
+        "operation_status": "PASSED",
+        **extra,
+    }
+
+
+@pytest.mark.asyncio
+async def test_build_bridge_transfers_only_explicit_files(tmp_path: Path) -> None:
+    observed: dict[str, str] = {}
+
+    async def build(source_path: str, output_path: str) -> dict[str, Any]:
+        observed["source_path"] = source_path
+        observed["output_path"] = output_path
+        assert Path(source_path).read_bytes() == b"original-xlsb"
+        Path(output_path).write_bytes(b"native-ods")
+        return _success(target_build="26.2.4.2")
+
+    tool = StructuredTool.from_function(
+        coroutine=build,
+        name="build_interactive_game_target",
+        description="Build target.",
+    )
+    backend = _Backend({"/workspace/source/game.xlsb": b"original-xlsb"})
+    registry = bridge_migration_mcp_registry(
+        _registry("build_interactive_game_target", tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    result = await registry.curated[0].tool.ainvoke(
+        {
+            "source_path": "/workspace/source/game.xlsb",
+            "output_path": "/workspace/migration/output/target.ods",
+        }
+    )
+
+    assert result["success"] is True
+    assert backend.downloads == ["/workspace/source/game.xlsb"]
+    assert backend.uploads == ["/workspace/migration/output/target.ods"]
+    assert backend.files["/workspace/migration/output/target.ods"] == b"native-ods"
+    assert observed["source_path"].startswith(f"{tmp_path}/")
+    assert observed["output_path"].startswith(f"{tmp_path}/")
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_bridge_rejects_paths_outside_sandbox_workspace(tmp_path: Path) -> None:
+    async def build(source_path: str, output_path: str) -> dict[str, Any]:
+        return _success(source_path=source_path, output_path=output_path)
+
+    tool = StructuredTool.from_function(
+        coroutine=build,
+        name="build_interactive_game_target",
+        description="Build target.",
+    )
+    backend = _Backend({})
+    registry = bridge_migration_mcp_registry(
+        _registry("build_interactive_game_target", tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    with pytest.raises(MCPBridgeError, match="below /workspace"):
+        await registry.curated[0].tool.ainvoke(
+            {
+                "source_path": "/etc/passwd",
+                "output_path": "/workspace/migration/output/target.ods",
+            }
+        )
+
+    assert backend.downloads == []
+    assert backend.uploads == []
+
+
+def test_path_bearing_tools_are_hidden_without_configured_bridge() -> None:
+    async def build(source_path: str, output_path: str) -> dict[str, Any]:
+        return _success(source_path=source_path, output_path=output_path)
+
+    tool = StructuredTool.from_function(
+        coroutine=build,
+        name="build_interactive_game_target",
+        description="Build target.",
+    )
+
+    registry = bridge_migration_mcp_registry(
+        _registry("build_interactive_game_target", tool),
+        backend=lambda: cast(SandboxBackendProtocol, _Backend({})),
+        thread_id="private-thread",
+        bridge_root=None,
+    )
+
+    assert registry.curated == ()
+    runtime_health = registry.health["runtime"]
+    assert runtime_health.capabilities == ()
+    assert runtime_health.reason == "path-bearing tools withheld: secure bridge not configured"
+
+
+@pytest.mark.asyncio
+async def test_failed_open_removes_private_document_copy(tmp_path: Path) -> None:
+    async def open_document(session_id: str, document_path: str) -> dict[str, Any]:
+        assert session_id == "runtime-session"
+        assert Path(document_path).read_bytes() == b"private-input"
+        return {
+            "success": False,
+            "operation_status": "FAILED",
+            "error": {"message": "office rejected document"},
+        }
+
+    tool = StructuredTool.from_function(
+        coroutine=open_document,
+        name="open_document",
+        description="Open target.",
+    )
+    backend = _Backend({"/workspace/migration/input.ods": b"private-input"})
+    registry = bridge_migration_mcp_registry(
+        _registry("open_document", tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    with pytest.raises(MCPBridgeError, match="office rejected document"):
+        await registry.curated[0].tool.ainvoke(
+            {
+                "session_id": "runtime-session",
+                "document_path": "/workspace/migration/input.ods",
+            }
+        )
+
+    assert backend.downloads == ["/workspace/migration/input.ods"]
+    assert list((tmp_path / "sessions").iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_session_save_returns_output_to_same_private_sandbox(tmp_path: Path) -> None:
+    async def save(session_id: str, output_path: str | None = None) -> dict[str, Any]:
+        assert session_id == "runtime-session"
+        assert output_path is not None
+        Path(output_path).write_bytes(b"saved-ods")
+        return _success(session_id=session_id)
+
+    tool = StructuredTool.from_function(
+        coroutine=save,
+        name="save",
+        description="Save target.",
+    )
+    backend = _Backend({})
+    registry = bridge_migration_mcp_registry(
+        _registry("save", tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    result = await registry.curated[0].tool.ainvoke(
+        {
+            "session_id": "runtime-session",
+            "output_path": "/workspace/migration/evidence/saved.ods",
+        }
+    )
+
+    assert result["success"] is True
+    assert backend.files["/workspace/migration/evidence/saved.ods"] == b"saved-ods"
+    assert backend.uploads == ["/workspace/migration/evidence/saved.ods"]

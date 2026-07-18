@@ -53,6 +53,9 @@ RUNTIME_TOOLS = frozenset(
         "reopen",
         "collect_logs",
         "destroy_session",
+        "build_interactive_game_target",
+        "run_interactive_game_scenario",
+        "bundle_interactive_game_replays",
     }
 )
 CORPUS_PUBLIC_TOOLS = frozenset(
@@ -97,6 +100,9 @@ REVIEWER_RUNTIME_TOOLS = frozenset(
         "reopen",
         "collect_logs",
         "destroy_session",
+        "build_interactive_game_target",
+        "run_interactive_game_scenario",
+        "bundle_interactive_game_replays",
     }
 )
 
@@ -159,6 +165,7 @@ ROLE_ALLOWLISTS: Mapping[str, Mapping[ServiceName, frozenset[str]]] = {
                 "reopen",
                 "collect_logs",
                 "destroy_session",
+                "build_interactive_game_target",
             }
         ),
         "corpus": frozenset({"search_public_fixtures", "run_public_suite"}),
@@ -179,6 +186,8 @@ ROLE_ALLOWLISTS: Mapping[str, Mapping[ServiceName, frozenset[str]]] = {
                 "reopen",
                 "collect_logs",
                 "destroy_session",
+                "run_interactive_game_scenario",
+                "bundle_interactive_game_replays",
             }
         ),
         "corpus": frozenset({"search_public_fixtures", "run_public_suite"}),
