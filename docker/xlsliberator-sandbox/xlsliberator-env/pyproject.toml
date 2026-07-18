@@ -1,0 +1,33 @@
+[project]
+name = "xlsliberator-sandbox-dependencies"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1.0",
+    "defusedxml>=0.7.1",
+    "fastmcp>=2.0.0",
+    "lark>=1.1.0",
+    "loguru>=0.7.0",
+    "msoffcrypto-tool>=5.4.2",
+    "odfpy>=1.4.1",
+    "oletools>=0.60",
+    "openpyxl>=3.1.0",
+    "pydantic>=2.0.0",
+    "pyxlsb>=1.0.10",
+    "pyyaml>=6.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=0.28.0",
+    "hypothesis>=6.0.0",
+    "mypy>=1.5.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-xdist>=3.3.0",
+    "ruff>=0.1.0",
+    "types-defusedxml",
+    "types-openpyxl",
+    "types-pyyaml",
+]

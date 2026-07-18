@@ -139,17 +139,22 @@ RUN UV_PROJECT_ENVIRONMENT=/opt/open-swe-venv \
       --no-install-project \
       --python /usr/local/bin/python3.12
 
-COPY --from=xlsliberator pyproject.toml uv.lock README.md /opt/xlsliberator-source/
+COPY --from=xlsliberator pyproject.toml README.md /opt/xlsliberator-source/
 COPY --from=xlsliberator src /opt/xlsliberator-source/src
 COPY --from=xlsliberator rules /opt/xlsliberator-source/rules
+COPY docker/xlsliberator-sandbox/xlsliberator-env/pyproject.toml \
+     /opt/xlsliberator-environment/pyproject.toml
 
 RUN test -n "${XLSLIBERATOR_SOURCE_COMMIT}" \
     && UV_PROJECT_ENVIRONMENT=/opt/xlsliberator-venv \
        uv sync \
-         --project /opt/xlsliberator-source \
-         --locked \
-         --extra dev \
+         --project /opt/xlsliberator-environment \
          --python /usr/local/bin/python3.12 \
+         --no-install-project \
+    && uv pip install \
+         --python /opt/xlsliberator-venv/bin/python \
+         --no-deps \
+         --editable /opt/xlsliberator-source \
     && chmod -R a-w /opt/xlsliberator-source
 
 COPY docker/xlsliberator-sandbox/entrypoint.sh /usr/local/bin/xlsliberator-sandbox-entrypoint

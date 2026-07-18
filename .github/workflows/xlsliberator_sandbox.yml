@@ -60,6 +60,9 @@ jobs:
         working-directory: xlsliberator-swe
         run: |
           scripts/check_sandbox_no_secrets.sh "${SANDBOX_IMAGE}"
+          docker run --rm --entrypoint /bin/sh "${SANDBOX_IMAGE}" \
+            -c 'cat /opt/xlsliberator-environment/uv.lock' \
+            > docker/xlsliberator-sandbox/xlsliberator-env/generated.uv.lock
           docker image inspect "${SANDBOX_IMAGE}" > sandbox-image-inspect.json
           docker run --rm "${SANDBOX_IMAGE}" \
             xlsliberator-sandbox-identity > sandbox-identity.json
@@ -120,6 +123,7 @@ jobs:
           path: |
             libreoffice-mcp.log
             xlsliberator-sandbox.spdx.json
+            xlsliberator-swe/docker/xlsliberator-sandbox/xlsliberator-env/generated.uv.lock
             xlsliberator-swe/sandbox-identity.json
             xlsliberator-swe/sandbox-image-inspect.json
           retention-days: 14
