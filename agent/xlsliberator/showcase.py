@@ -93,9 +93,7 @@ class SourceIdentity(StrictModel):
 
     original_filename: Literal["TetrisGameDemo.xlsb"] = "TetrisGameDemo.xlsb"
     source_format: Literal["xlsb"] = "xlsb"
-    sha256: Literal[
-        "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
-    ] = (
+    sha256: Literal["da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"] = (
         INTERACTIVE_GAME_SOURCE_SHA256
     )
     immutable: Literal[True] = True
@@ -127,9 +125,7 @@ class InvocationEvidence(StrictModel):
     thread_id: str = Field(min_length=1, max_length=200)
     run_id: str = Field(min_length=1, max_length=200)
     terminal_status: Literal["DELIVERABLE"] = "DELIVERABLE"
-    source_sha256: Literal[
-        "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
-    ] = (
+    source_sha256: Literal["da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"] = (
         INTERACTIVE_GAME_SOURCE_SHA256
     )
     target_libreoffice_build: Literal["26.2.4.2"] = LIBREOFFICE_BUILD
