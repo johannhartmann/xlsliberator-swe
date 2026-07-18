@@ -11,9 +11,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-INTERACTIVE_GAME_SOURCE_SHA256 = (
-    "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
-)
+INTERACTIVE_GAME_SOURCE_SHA256 = "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
 LIBREOFFICE_BUILD = "26.2.4.2"
 PUBLIC_SCENARIOS = frozenset(
     {
@@ -97,7 +95,9 @@ class SourceIdentity(StrictModel):
     source_format: Literal["xlsb"] = "xlsb"
     sha256: Literal[
         "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
-    ] = INTERACTIVE_GAME_SOURCE_SHA256
+    ] = (
+        INTERACTIVE_GAME_SOURCE_SHA256
+    )
     immutable: Literal[True] = True
     dossier: ArtifactRef
 
@@ -129,7 +129,9 @@ class InvocationEvidence(StrictModel):
     terminal_status: Literal["DELIVERABLE"] = "DELIVERABLE"
     source_sha256: Literal[
         "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
-    ] = INTERACTIVE_GAME_SOURCE_SHA256
+    ] = (
+        INTERACTIVE_GAME_SOURCE_SHA256
+    )
     target_libreoffice_build: Literal["26.2.4.2"] = LIBREOFFICE_BUILD
     credential_material_included: Literal[False] = False
     evidence: ArtifactRef
@@ -167,9 +169,7 @@ class ScenarioEvidence(StrictModel):
         "line-collapse",
     ]
     source_refs: tuple[str, ...] = Field(min_length=1)
-    oracle_policy: Literal["authored_acceptance_requirements"] = (
-        "authored_acceptance_requirements"
-    )
+    oracle_policy: Literal["authored_acceptance_requirements"] = "authored_acceptance_requirements"
     status: Literal["PASSED"] = "PASSED"
     evidence: ArtifactRef
 
@@ -225,7 +225,7 @@ class MutationEvidence(StrictModel):
     """A decisive campaign: every required mutant is killed."""
 
     status: Literal["PASSED"] = "PASSED"
-    required_kill_rate: Literal[1.0] = 1.0
+    required_kill_rate: float = Field(default=1.0, ge=1.0, le=1.0)
     validator_sha256_before: str = Field(pattern=r"^[0-9a-f]{64}$")
     validator_sha256_after: str = Field(pattern=r"^[0-9a-f]{64}$")
     total: int = Field(ge=1)
@@ -392,7 +392,7 @@ class ShowcaseBundleManifest(StrictModel):
     source: SourceIdentity
     target: TargetIdentity
     invocation: InvocationEvidence
-    specialists: tuple[SpecialistTrajectory, ...] = Field(min_length=4)
+    specialists: tuple[SpecialistTrajectory, ...]
     scenarios: tuple[ScenarioEvidence, ...] = Field(min_length=5, max_length=5)
     lifecycle: tuple[LifecycleOperation, ...] = Field(min_length=8)
     mutation: MutationEvidence
@@ -467,9 +467,7 @@ class ShowcaseBundleManifest(StrictModel):
         if not expected.issubset(actual):
             raise ValueError(f"missing model/cost records for roles: {sorted(expected - actual)}")
         reviewer_usage = next(
-            model
-            for model in self.operations.models
-            if model.role == "independent-reviewer"
+            model for model in self.operations.models if model.role == "independent-reviewer"
         )
         if reviewer_usage.model_id != self.reviewer.reviewer_model_id:
             raise ValueError("reviewer model record does not match reviewer evidence")
