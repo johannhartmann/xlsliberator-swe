@@ -7,6 +7,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from zipfile import ZipFile
 
 import pytest
 from pydantic import ValidationError
@@ -14,7 +15,9 @@ from pydantic import ValidationError
 from agent.xlsliberator.showcase import (
     INTERACTIVE_GAME_SOURCE_SHA256,
     ShowcaseBundleManifest,
+    inspect_showcase_archive,
     inspect_showcase_bundle,
+    main,
 )
 
 SCENARIOS = [
@@ -296,6 +299,33 @@ def test_complete_content_bound_showcase_bundle_passes(tmp_path: Path) -> None:
     assert inspected.target.full_build == "26.2.4.2"
     assert {scenario.scenario_id for scenario in inspected.scenarios} == set(SCENARIOS)
     assert inspected.reviewer.state == "APPROVE"
+
+
+def test_complete_showcase_archive_passes_safe_extraction(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "bundle"
+    _build_bundle(root)
+    archive = tmp_path / "public-showcase.zip"
+    with ZipFile(archive, "w") as output:
+        for path in sorted(root.rglob("*")):
+            if path.is_file():
+                output.write(path, path.relative_to(root).as_posix())
+
+    inspected = inspect_showcase_archive(archive)
+
+    assert inspected.release_ready is True
+    assert main(["--archive", str(archive)]) == 0
+    assert '"reviewer_state": "APPROVE"' in capsys.readouterr().out
+
+
+def test_showcase_archive_rejects_path_traversal(tmp_path: Path) -> None:
+    archive = tmp_path / "unsafe.zip"
+    with ZipFile(archive, "w") as output:
+        output.writestr("../escape.txt", "blocked")
+
+    with pytest.raises(ValueError, match="path is unsafe"):
+        inspect_showcase_archive(archive)
 
 
 @pytest.mark.parametrize(

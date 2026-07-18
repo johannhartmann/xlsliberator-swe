@@ -46,6 +46,8 @@ def test_lead_prompt_contains_ordered_fourteen_stage_loop() -> None:
     assert "originating UI or channel" in MIGRATION_LEAD_PROMPT
     assert "candidate tournament" in MIGRATION_LEAD_PROMPT
     assert "Treat outputs as private" in MIGRATION_LEAD_PROMPT
+    assert "opaque hidden-corpus repair ID is `interactive-game`" in MIGRATION_LEAD_PROMPT
+    assert "migration/generated/public-showcase.zip" in MIGRATION_LEAD_PROMPT
 
 
 @pytest.mark.parametrize(

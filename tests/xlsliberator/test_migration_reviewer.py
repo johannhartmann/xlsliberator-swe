@@ -18,6 +18,7 @@ from agent.xlsliberator.reviewer import (
     LiberationReview,
     MigrationReviewerReadOnlyMiddleware,
     MigrationReviewResult,
+    request_independent_migration_review,
     reviewer_prompt,
 )
 
@@ -125,3 +126,13 @@ def test_fake_reviewer_cannot_approve_without_hidden_and_liberation_gates() -> N
 def test_reviewer_prompt_never_authorizes_hidden_definition_export() -> None:
     assert "never quote, copy, summarize, write, or return them" in REVIEWER_SYSTEM_PROMPT
     assert "aggregate counts" in REVIEWER_SYSTEM_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_independent_review_rejects_malformed_repair_id_before_context_access() -> None:
+    result = await request_independent_migration_review("../hidden")
+
+    assert result == {
+        "success": False,
+        "error": "repair_id must be a lowercase alphanumeric or hyphen identifier",
+    }

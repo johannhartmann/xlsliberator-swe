@@ -130,6 +130,7 @@ RUN set -eux; \
 
 COPY pyproject.toml uv.lock README.md /opt/open-swe/
 COPY scripts/create_sandbox_snapshot.py /opt/open-swe/scripts/create_sandbox_snapshot.py
+COPY agent/xlsliberator/showcase.py /opt/xlsliberator-showcase/showcase.py
 
 RUN UV_PROJECT_ENVIRONMENT=/opt/open-swe-venv \
     uv sync \
@@ -173,6 +174,7 @@ RUN chmod 0555 \
       /usr/local/bin/xlsliberator-sandbox-smoke \
       /usr/local/bin/xlsliberator-build-farm-client \
       /opt/xlsliberator-sandbox/mcp_smoke.py \
+      /opt/xlsliberator-showcase/showcase.py \
       /opt/open-swe/scripts/create_sandbox_snapshot.py \
     && ln -s /opt/libreoffice26.2/program/soffice /usr/local/bin/soffice \
     && mkdir -p /etc/xlsliberator-sandbox /workspace /home/sandbox /tmp/home \

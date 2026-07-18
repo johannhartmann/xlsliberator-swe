@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
+import stat
 from datetime import datetime
 from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
 from typing import Literal, Self
+from zipfile import BadZipFile, ZipFile
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 INTERACTIVE_GAME_SOURCE_SHA256 = "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
 LIBREOFFICE_BUILD = "26.2.4.2"
+MAX_ARCHIVE_FILES = 500
+MAX_ARCHIVE_FILE_BYTES = 256 * 1024 * 1024
+MAX_ARCHIVE_TOTAL_BYTES = 512 * 1024 * 1024
 PUBLIC_SCENARIOS = frozenset(
     {
         "keyboard-control",
@@ -547,6 +554,64 @@ def inspect_showcase_bundle(directory: Path) -> ShowcaseBundleManifest:
     return manifest
 
 
+def inspect_showcase_archive(archive_path: Path) -> ShowcaseBundleManifest:
+    """Safely extract and validate a public showcase archive."""
+    if archive_path.is_symlink():
+        raise ValueError("showcase archive is absent or unsafe")
+    archive = archive_path.resolve()
+    if not archive.is_file():
+        raise ValueError("showcase archive is absent or unsafe")
+    try:
+        with ZipFile(archive) as bundle:
+            members = bundle.infolist()
+            file_members = [member for member in members if not member.is_dir()]
+            if not file_members or len(members) > MAX_ARCHIVE_FILES:
+                raise ValueError("showcase archive file count is invalid")
+            names: set[str] = set()
+            total_bytes = 0
+            for member in members:
+                name = member.filename
+                path = PurePosixPath(name)
+                normalized = path.as_posix().rstrip("/")
+                if (
+                    not normalized
+                    or path.is_absolute()
+                    or ".." in path.parts
+                    or "." in path.parts
+                    or "\\" in name
+                    or normalized != name.rstrip("/")
+                    or len(normalized) > 500
+                    or len(path.parts) > 20
+                ):
+                    raise ValueError(f"showcase archive path is unsafe: {name}")
+                if normalized in names:
+                    raise ValueError(f"showcase archive path is duplicated: {normalized}")
+                names.add(normalized)
+                mode = member.external_attr >> 16
+                if stat.S_ISLNK(mode):
+                    raise ValueError(f"showcase archive contains a symlink: {name}")
+                if member.flag_bits & 0x1:
+                    raise ValueError(f"showcase archive member is encrypted: {name}")
+                if member.file_size > MAX_ARCHIVE_FILE_BYTES:
+                    raise ValueError(f"showcase archive member is oversized: {name}")
+                if not member.is_dir():
+                    total_bytes += member.file_size
+            if total_bytes > MAX_ARCHIVE_TOTAL_BYTES:
+                raise ValueError("showcase archive expands beyond its size limit")
+
+            with TemporaryDirectory(prefix="xlsliberator-showcase-") as temp:
+                root = Path(temp)
+                for member in file_members:
+                    destination = root.joinpath(*PurePosixPath(member.filename).parts)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with bundle.open(member) as source, destination.open("wb") as output:
+                        while chunk := source.read(1024 * 1024):
+                            output.write(chunk)
+                return inspect_showcase_bundle(root)
+    except BadZipFile as exc:
+        raise ValueError("showcase archive is not a valid ZIP file") from exc
+
+
 def _confined_file(root: Path, reference: str) -> Path:
     _safe_artifact_path(reference)
     path = root.joinpath(*PurePosixPath(reference).parts)
@@ -559,3 +624,35 @@ def _confined_file(root: Path, reference: str) -> Path:
     if not resolved.is_relative_to(root) or not path.is_file():
         raise ValueError(f"showcase artifact is missing or escapes the bundle: {reference}")
     return resolved
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Validate a showcase directory or archive from a Docker-contained CLI."""
+    parser = argparse.ArgumentParser(description="Validate an XLSLiberator showcase bundle")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--directory", type=Path)
+    source.add_argument("--archive", type=Path)
+    arguments = parser.parse_args(argv)
+    manifest = (
+        inspect_showcase_archive(arguments.archive)
+        if arguments.archive is not None
+        else inspect_showcase_bundle(arguments.directory)
+    )
+    print(
+        json.dumps(
+            {
+                "showcase_id": manifest.showcase_id,
+                "migration_id": manifest.migration_id,
+                "status": manifest.status,
+                "release_ready": manifest.release_ready,
+                "target_build": manifest.target.full_build,
+                "reviewer_state": manifest.reviewer.state,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

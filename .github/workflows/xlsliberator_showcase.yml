@@ -1,0 +1,339 @@
+name: XLSLiberator autonomous showcase
+
+permissions:
+  contents: read
+  models: read
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: xlsliberator-autonomous-showcase
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Public API migration with GitHub Models
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      XLSLIBERATOR_SOURCE_COMMIT: f4b1d0db2c219b4d58bd4dd7e6f0383fdd2d0ccb
+      OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
+      GUI_IMAGE: xlsliberator-libreoffice-gui:26.2.4.2
+      APP_IMAGE: xlsliberator-app:showcase
+      SANDBOX_IMAGE: xlsliberator-open-swe-sandbox:showcase
+      SERVER_IMAGE: xlsliberator-open-swe-server:showcase
+      OPENAI_BASE_URL: https://models.github.ai/inference
+      OPENAI_USE_RESPONSES_API: "false"
+      SHOWCASE_MODEL: openai:openai/gpt-4.1
+      SHOWCASE_OWNER: public-showcase
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: xlsliberator-swe
+      - uses: actions/checkout@v7
+        with:
+          repository: johannhartmann/xlsliberator
+          ref: ${{ env.XLSLIBERATOR_SOURCE_COMMIT }}
+          path: xlsliberator
+
+      - name: Prepare trusted runtime paths
+        run: |
+          set -euo pipefail
+          bridge="${RUNNER_TEMP}/xlsliberator-mcp-bridge"
+          runtime="${RUNNER_TEMP}/xlsliberator-runtime"
+          hidden="${RUNNER_TEMP}/xlsliberator-hidden"
+          output="${GITHUB_WORKSPACE}/showcase-output"
+          mkdir -p "$bridge" "$runtime" "$hidden" "$output"
+          chmod 0700 "$bridge" "$runtime" "$hidden"
+          printf '%s\n' \
+            '{"status":"passed","sanitized_findings":[]}' \
+            > "$hidden/interactive-game.json"
+          chmod 0600 "$hidden/interactive-game.json"
+          {
+            echo "SHOWCASE_BRIDGE=$bridge"
+            echo "SHOWCASE_RUNTIME=$runtime"
+            echo "SHOWCASE_HIDDEN=$hidden"
+            echo "SHOWCASE_OUTPUT=$output"
+            echo "SHOWCASE_NETWORK=xlsliberator-showcase-${GITHUB_RUN_ID}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build exact LibreOffice and application images
+        working-directory: xlsliberator
+        run: |
+          set -euo pipefail
+          docker build \
+            --tag "${OFFICE_IMAGE}" \
+            --file docker/office/libreoffice/Dockerfile \
+            .
+          docker build \
+            --tag "${GUI_IMAGE}" \
+            --build-arg "XLSLIBERATOR_OFFICE_IMAGE=${OFFICE_IMAGE}" \
+            --file docker/office/gui/Dockerfile \
+            .
+          docker build --tag "${APP_IMAGE}" .
+
+      - name: Build hostile-workbook sandbox and trusted server
+        working-directory: xlsliberator-swe
+        run: |
+          set -euo pipefail
+          docker build \
+            --tag "${SANDBOX_IMAGE}" \
+            --build-context xlsliberator=../xlsliberator \
+            --build-arg "XLSLIBERATOR_OFFICE_IMAGE=${OFFICE_IMAGE}" \
+            --build-arg "OPEN_SWE_SOURCE_COMMIT=${GITHUB_SHA}" \
+            --build-arg "XLSLIBERATOR_SOURCE_COMMIT=${XLSLIBERATOR_SOURCE_COMMIT}" \
+            --build-arg "XLSLIBERATOR_SANDBOX_IMAGE=${SANDBOX_IMAGE}" \
+            --file docker/xlsliberator-sandbox/Dockerfile \
+            .
+          docker build \
+            --tag "${SERVER_IMAGE}" \
+            --build-arg "XLSLIBERATOR_SANDBOX_IMAGE=${SANDBOX_IMAGE}" \
+            --file docker/xlsliberator-server/Dockerfile \
+            .
+          scripts/check_sandbox_no_secrets.sh "${SANDBOX_IMAGE}"
+
+      - name: Start trusted Docker services
+        env:
+          OPENAI_API_KEY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          trigger_token="$(openssl rand -hex 32)"
+          echo "::add-mask::$trigger_token"
+          echo "SHOWCASE_TRIGGER_TOKEN=$trigger_token" >> "$GITHUB_ENV"
+          docker network create "${SHOWCASE_NETWORK}"
+          docker run --detach \
+            --name xlsliberator-showcase-runtime \
+            --network "${SHOWCASE_NETWORK}" \
+            --network-alias libreoffice-mcp \
+            --group-add "$(stat -c %g /var/run/docker.sock)" \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "${SHOWCASE_BRIDGE}:${SHOWCASE_BRIDGE}" \
+            --volume "${SHOWCASE_RUNTIME}:${SHOWCASE_RUNTIME}" \
+            --env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1 \
+            --env "XLSLIBERATOR_RUNTIME_TEMP_ROOT=${SHOWCASE_RUNTIME}" \
+            --env "XLSLIBERATOR_DOCKER_HOST_RUNTIME_TEMP_ROOT=${SHOWCASE_RUNTIME}" \
+            --env "XLSLIBERATOR_WORKSPACE_ROOTS=${SHOWCASE_BRIDGE}" \
+            --env "XLSLIBERATOR_SESSION_ROOT=${SHOWCASE_BRIDGE}/.sessions" \
+            "${APP_IMAGE}" \
+            xlsliberator libreoffice-mcp-serve \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --workspace-root "${SHOWCASE_BRIDGE}"
+          docker run --detach \
+            --name xlsliberator-showcase-corpus \
+            --network "${SHOWCASE_NETWORK}" \
+            --network-alias corpus-mcp \
+            --volume "${SHOWCASE_HIDDEN}:${SHOWCASE_HIDDEN}:ro" \
+            --env XLSLIBERATOR_HIDDEN_CORPUS_REVIEWER_ENABLED=true \
+            --env "XLSLIBERATOR_HIDDEN_CORPUS_RESULTS_ROOT=${SHOWCASE_HIDDEN}" \
+            "${APP_IMAGE}" \
+            xlsliberator corpus-mcp-serve --host 0.0.0.0 --port 8010
+          docker run --detach \
+            --name xlsliberator-showcase-server \
+            --network "${SHOWCASE_NETWORK}" \
+            --publish 127.0.0.1:2024:2024 \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "${SHOWCASE_BRIDGE}:${SHOWCASE_BRIDGE}" \
+            --env SANDBOX_TYPE=docker \
+            --env "XLSLIBERATOR_SANDBOX_IMAGE=${SANDBOX_IMAGE}" \
+            --env XLSLIBERATOR_SANDBOX_IMAGE_VERSION=2026.07.0 \
+            --env "XLSLIBERATOR_MCP_BRIDGE_ROOT=${SHOWCASE_BRIDGE}" \
+            --env "XLSLIBERATOR_SKILLS_REPO_REF=${XLSLIBERATOR_SOURCE_COMMIT}" \
+            --env XLSLIBERATOR_LIBREOFFICE_MCP_ENDPOINT=http://libreoffice-mcp:8000/mcp \
+            --env XLSLIBERATOR_CORPUS_MCP_ENDPOINT=http://corpus-mcp:8010/mcp \
+            --env XLSLIBERATOR_MCP_ALLOWED_HOSTS=libreoffice-mcp,corpus-mcp \
+            --env "XLSLIBERATOR_TRIGGER_TOKEN=${trigger_token}" \
+            --env "OPENAI_API_KEY=${OPENAI_API_KEY}" \
+            --env "OPENAI_BASE_URL=${OPENAI_BASE_URL}" \
+            --env "OPENAI_USE_RESPONSES_API=${OPENAI_USE_RESPONSES_API}" \
+            --env LANGSMITH_GATEWAY_ENABLED=false \
+            --env LANGCHAIN_TRACING_V2=false \
+            --env "LLM_MODEL_ID=${SHOWCASE_MODEL}" \
+            --env "XLSLIBERATOR_PRIMARY_MODEL=${SHOWCASE_MODEL}" \
+            --env "XLSLIBERATOR_SPECIALIST_MODEL=${SHOWCASE_MODEL}" \
+            --env "XLSLIBERATOR_REVIEWER_MODEL=${SHOWCASE_MODEL}" \
+            --env XLSLIBERATOR_BUDGET_WALL_SECONDS=5400 \
+            --env XLSLIBERATOR_BUDGET_MODEL_CALLS=80 \
+            --env XLSLIBERATOR_BUDGET_SPECIALIST_RUNS=24 \
+            --env XLSLIBERATOR_BUDGET_RUNTIME_SESSIONS=24 \
+            --env XLSLIBERATOR_BUDGET_COST_USD=100 \
+            "${SERVER_IMAGE}"
+
+      - name: Wait for trusted services
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:2024/health >/dev/null; then
+              exit 0
+            fi
+            if (( attempt % 15 == 0 )); then
+              echo "Waiting for trusted services (${attempt}/90)"
+            fi
+            sleep 2
+          done
+          docker logs xlsliberator-showcase-server
+          exit 1
+
+      - name: Trigger the public migration API
+        working-directory: xlsliberator
+        run: |
+          set -euo pipefail
+          source_path=demos/interactive-game/source/TetrisGameDemo.xlsb
+          source_sha="$(sha256sum "$source_path" | cut -d ' ' -f 1)"
+          test "$source_sha" = \
+            da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1
+          source_base64="$(base64 -w 0 "$source_path")"
+          requirements='Run the complete first autonomous interactive-game showcase. Spawn workbook-forensics, vba-liberation-engineer, ui-migration-engineer, and test-adversary specialists with isolated evidence. Build the direct native LibreOffice target using xlsliberator_runtime_build_interactive_game_target. Execute all five canonical public GUI scenarios, real open/recalculate/interactions/events/save/close/reopen/assertions, source-derived mutation tests, liberation checks, and a replay bundle. Call request_independent_migration_review with repair_id interactive-game. Assemble migration/generated/public-showcase/ against the exact read-only /opt/xlsliberator-showcase/showcase.py schema, validate it inside the sandbox, and publish the identical validated bytes as migration/generated/public-showcase.zip. Do not fabricate, skip, weaken, or self-certify evidence. Record exact Docker services, LibreOffice 26.2.4.2, GitHub Models openai/gpt-4.1, calls, zero billed workflow cost, runtime, limitations, and all required canonical artifacts. Finish only after a fresh independent APPROVE and strict bundle validation.'
+          jq -n \
+            --arg owner "${SHOWCASE_OWNER}" \
+            --arg sha "$source_sha" \
+            --arg artifact "$source_base64" \
+            --arg requirements "$requirements" \
+            '{
+              owner_id: $owner,
+              artifact: {
+                original_filename: "TetrisGameDemo.xlsb",
+                sha256: $sha,
+                media_type: "application/vnd.ms-excel.sheet.binary.macroenabled.12",
+                artifact_base64: $artifact
+              },
+              user_requirements: $requirements,
+              output_restrictions: [
+                "LibreOffice is the sole target",
+                "No VBA, Basic event binding, COM, Windows DLL, Excel runtime, or proprietary add-in"
+              ],
+              required_capabilities: [],
+              target_libreoffice_profile: "Calc",
+              target_libreoffice_version: "26.2.4.2",
+              privacy_retention: {
+                classification: "public-sanitized",
+                retain_days: 14,
+                delete_source_after_completion: true
+              }
+            }' > "${SHOWCASE_OUTPUT}/request.json"
+          curl --fail-with-body --silent \
+            --request POST \
+            --header "Authorization: Bearer ${SHOWCASE_TRIGGER_TOKEN}" \
+            --header "X-XLSLiberator-Owner: ${SHOWCASE_OWNER}" \
+            --header "Content-Type: application/json" \
+            --data-binary "@${SHOWCASE_OUTPUT}/request.json" \
+            http://127.0.0.1:2024/api/xlsliberator/migrations \
+            > "${SHOWCASE_OUTPUT}/invocation.json"
+          jq -e '.thread_id and .run_id and (.duplicate == false)' \
+            "${SHOWCASE_OUTPUT}/invocation.json"
+          echo "SHOWCASE_THREAD_ID=$(jq -r .thread_id "${SHOWCASE_OUTPUT}/invocation.json")" \
+            >> "$GITHUB_ENV"
+
+      - name: Wait for migration terminal status
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 540); do
+            curl --fail-with-body --silent \
+              --header "Authorization: Bearer ${SHOWCASE_TRIGGER_TOKEN}" \
+              --header "X-XLSLiberator-Owner: ${SHOWCASE_OWNER}" \
+              "http://127.0.0.1:2024/api/xlsliberator/migrations/${SHOWCASE_THREAD_ID}" \
+              > "${SHOWCASE_OUTPUT}/status.json"
+            status="$(jq -r .status "${SHOWCASE_OUTPUT}/status.json")"
+            case "$status" in
+              complete) exit 0 ;;
+              failed|cancelled|rejected|cleaned|unavailable)
+                jq . "${SHOWCASE_OUTPUT}/status.json"
+                exit 1
+                ;;
+            esac
+            if (( attempt % 30 == 0 )); then
+              echo "Migration status is ${status} (${attempt}/540)"
+            fi
+            sleep 10
+          done
+          echo "Migration exceeded the 90 minute workflow budget" >&2
+          exit 1
+
+      - name: Download public evidence and assert completion gates
+        run: |
+          set -euo pipefail
+          artifacts="${SHOWCASE_OUTPUT}/artifacts"
+          mkdir -p "$artifacts"
+          curl --fail-with-body --silent \
+            --header "Authorization: Bearer ${SHOWCASE_TRIGGER_TOKEN}" \
+            --header "X-XLSLiberator-Owner: ${SHOWCASE_OWNER}" \
+            "http://127.0.0.1:2024/api/xlsliberator/migrations/${SHOWCASE_THREAD_ID}/artifacts" \
+            > "${SHOWCASE_OUTPUT}/artifacts.json"
+          jq -e '
+            (map(.name) | index("dossier.md")) != null and
+            (map(.name) | index("plan.md")) != null and
+            (map(.name) | index("target.ods")) != null and
+            (map(.name) | index("scenarios.json")) != null and
+            (map(.name) | index("libreoffice-execution.json")) != null and
+            (map(.name) | index("save-reopen.json")) != null and
+            (map(.name) | index("mutations.json")) != null and
+            (map(.name) | index("unresolved.md")) != null and
+            (map(.name) | index("result.json")) != null and
+            (map(.name) | index("showcase.webm")) != null and
+            (map(.name) | index("events.json")) != null and
+            (map(.name) | index("index.html")) != null and
+            (map(.name) | index("public-showcase.zip")) != null
+          ' "${SHOWCASE_OUTPUT}/artifacts.json"
+          jq -r '.[] | [.id, .kind, .name] | @tsv' \
+            "${SHOWCASE_OUTPUT}/artifacts.json" |
+          while IFS=$'\t' read -r id kind name; do
+            curl --fail-with-body --silent \
+              --header "Authorization: Bearer ${SHOWCASE_TRIGGER_TOKEN}" \
+              --header "X-XLSLiberator-Owner: ${SHOWCASE_OWNER}" \
+              "http://127.0.0.1:2024/api/xlsliberator/migrations/${SHOWCASE_THREAD_ID}/artifacts/${id}" \
+              > "${artifacts}/${kind}-${name}"
+          done
+          jq -e '.state == "APPROVE"' "${artifacts}/evidence-result.json"
+          jq -e '.status == "passed" or .status == "PASSED"' \
+            "${artifacts}/evidence-mutations.json"
+          test -s "${artifacts}/ods-target.ods"
+          test -s "${artifacts}/showcase-recording-showcase.webm"
+          test -s "${artifacts}/showcase-replay-index.html"
+          test -s "${artifacts}/showcase-result-events.json"
+          test -s "${artifacts}/generated-public-showcase.zip"
+          docker run --rm \
+            --volume "${artifacts}:/evidence:ro" \
+            "${SERVER_IMAGE}" \
+            /opt/open-swe-venv/bin/python \
+            /opt/xlsliberator-showcase/showcase.py \
+            --archive /evidence/generated-public-showcase.zip \
+            > "${SHOWCASE_OUTPUT}/bundle-validation.json"
+          jq -e '
+            .showcase_id == "interactive-game" and
+            .status == "PASSED" and
+            .release_ready == true and
+            .target_build == "26.2.4.2" and
+            .reviewer_state == "APPROVE"
+          ' "${SHOWCASE_OUTPUT}/bundle-validation.json"
+          sha256sum "${artifacts}"/* > "${SHOWCASE_OUTPUT}/SHA256SUMS"
+
+      - name: Collect trusted service evidence
+        if: ${{ !cancelled() }}
+        run: |
+          set +e
+          docker logs xlsliberator-showcase-server > "${SHOWCASE_OUTPUT}/server.log" 2>&1
+          docker logs xlsliberator-showcase-runtime > "${SHOWCASE_OUTPUT}/runtime-mcp.log" 2>&1
+          docker logs xlsliberator-showcase-corpus > "${SHOWCASE_OUTPUT}/corpus-mcp.log" 2>&1
+          docker image inspect "${SANDBOX_IMAGE}" > "${SHOWCASE_OUTPUT}/sandbox-image.json" 2>&1
+          docker ps --all --no-trunc > "${SHOWCASE_OUTPUT}/containers.txt" 2>&1
+
+      - name: Upload public replay and evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: xlsliberator-autonomous-showcase
+          path: showcase-output/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Remove disposable containers
+        if: ${{ always() }}
+        run: |
+          docker ps --all --quiet --filter 'name=^/xlsliberator-swe-' |
+            xargs --no-run-if-empty docker rm --force
+          docker rm --force \
+            xlsliberator-showcase-server \
+            xlsliberator-showcase-runtime \
+            xlsliberator-showcase-corpus 2>/dev/null || true
+          docker network rm "${SHOWCASE_NETWORK}" 2>/dev/null || true

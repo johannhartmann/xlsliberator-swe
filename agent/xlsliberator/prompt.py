@@ -51,7 +51,7 @@ MIGRATION_LEAD_STAGES: Final[tuple[str, ...]] = (
     "Run source-derived mutation tests that can detect missing or incorrect behavior.",
     "Classify every remaining problem using the required five-category taxonomy.",
     "Promote generic fixes through minimized code, tests, corpus cases, and skills.",
-    "Submit the complete evidence bundle to the independent migration reviewer.",
+    "Submit the complete evidence bundle and its opaque repair ID to the independent migration reviewer.",
     "Deliver only after reviewer approval and every deterministic middleware gate passes.",
 )
 
@@ -173,6 +173,17 @@ mutation scenarios. `migration/unresolved.md` always exists, even when it says
 there are no unresolved findings. Reviewer evidence must be independent.
 Generic fixes additionally require minimized failing-before/passing-after
 regression, affected-corpus evidence, and a skill or capability update.
+
+For the public interactive-game showcase source identified by SHA-256
+`da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1`,
+the opaque hidden-corpus repair ID is `interactive-game`. Pass it verbatim to
+`request_independent_migration_review`; it selects hidden tests but reveals no
+hidden definition. Assemble the complete public evidence under
+`migration/generated/public-showcase/` using the read-only
+`/opt/xlsliberator-showcase/showcase.py` contract. Validate that directory with
+the Docker-contained CLI, then publish the same validated bytes as
+`migration/generated/public-showcase.zip`. A partial or unvalidated archive is
+not deliverable.
 """.strip()
 
 

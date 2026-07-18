@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shlex
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
@@ -52,6 +53,7 @@ logger = logging.getLogger(__name__)
 MIGRATION_REVIEW_TRACING_PROJECT = "xlsliberator-migration-review"
 REVIEW_RESULT_PATH = "migration/reviewer/result.json"
 TARGET_PATH = "migration/output/target.ods"
+_REPAIR_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,99}$")
 ReviewState = Literal["APPROVE", "REVISE", "BLOCK"]
 CheckState = Literal["PASS", "FAIL", "UNKNOWN", "NOT_REQUIRED"]
 ReviewerToolResult = ToolMessage | Command
@@ -395,8 +397,13 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
     ).with_config(config)
 
 
-async def request_independent_migration_review() -> dict[str, Any]:
+async def request_independent_migration_review(repair_id: str) -> dict[str, Any]:
     """Run a fresh independent workbook review and return only its safe result."""
+    if not _REPAIR_ID.fullmatch(repair_id):
+        return {
+            "success": False,
+            "error": "repair_id must be a lowercase alphanumeric or hyphen identifier",
+        }
     parent_config = get_config()
     configurable = dict(parent_config.get("configurable") or {})
     if configurable.get("task_kind") != TASK_KIND:
@@ -431,8 +438,10 @@ async def request_independent_migration_review() -> dict[str, Any]:
                 HumanMessage(
                     content=(
                         "Review the current private migration candidate against all canonical "
-                        "source and evidence artifacts. Run hidden acceptance and write only "
-                        "the structured reviewer result."
+                        "source and evidence artifacts. Call "
+                        "`xlsliberator_corpus_run_hidden_acceptance` with the exact opaque "
+                        f"`repair_id` value `{repair_id}`. Do not infer or replace it. Run "
+                        "hidden acceptance and write only the structured reviewer result."
                     )
                 )
             ]
