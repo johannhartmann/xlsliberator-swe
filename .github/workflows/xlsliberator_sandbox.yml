@@ -76,6 +76,70 @@ jobs:
              and .image.xlsliberator_commit == $xlsliberator
              and .image.libreoffice_build == "26.2.4.2"' \
             sandbox-identity.json
+      - name: Verify default hostile-workbook boundary
+        working-directory: xlsliberator-swe
+        run: |
+          set -euo pipefail
+          sandbox_args=(
+            --init
+            --network none
+            --read-only
+            --cap-drop ALL
+            --security-opt no-new-privileges
+            --pids-limit 64
+            --memory 512m
+            --cpus 1
+            --tmpfs /workspace:rw,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=0700
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m,uid=10001,gid=10001,mode=1777
+            --tmpfs /home/sandbox:rw,nosuid,nodev,size=128m,uid=10001,gid=10001,mode=0700
+          )
+          docker run --rm "${sandbox_args[@]}" "${SANDBOX_IMAGE}" sh -ec '
+            test ! -e /var/run/docker.sock
+            test -z "${OPENAI_API_KEY:-}${ANTHROPIC_API_KEY:-}${GITHUB_TOKEN:-}"
+            test -z "${LANGSMITH_API_KEY:-}${XLSLIBERATOR_LIBREOFFICE_MCP_TOKEN:-}"
+            if touch /etc/xlsliberator-escape 2>/dev/null; then exit 1; fi
+            open-swe-python -c '"'"'
+          import socket
+          sock = socket.socket()
+          sock.settimeout(0.2)
+          raise SystemExit(1 if sock.connect_ex(("1.1.1.1", 53)) == 0 else 0)
+          '"'"'
+            xlsprobe --help >/dev/null
+            xlsliberator-sandbox-identity >/dev/null
+          '
+          probe_name="xlsliberator-security-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker run --rm --detach --name "${probe_name}" \
+            "${sandbox_args[@]}" "${SANDBOX_IMAGE}" sh -ec 'sleep 300 & wait'
+          docker stop --time 1 "${probe_name}"
+          test -z "$(docker ps --all --quiet --filter "name=^/${probe_name}$")"
+      - name: Run Docker-based code and dependency audits
+        working-directory: xlsliberator-swe
+        run: |
+          docker run --rm \
+            --init \
+            --network bridge \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 128 \
+            --memory 2g \
+            --cpus 2 \
+            --volume "$PWD:/source:ro" \
+            --tmpfs /workspace:rw,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=0700 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=1777 \
+            --tmpfs /home/sandbox:rw,nosuid,nodev,size=1g,uid=10001,gid=10001,mode=0700 \
+            --env UV_CACHE_DIR=/home/sandbox/.cache/uv \
+            "${SANDBOX_IMAGE}" \
+            sh -ec '
+              cd /source
+              uvx --from bandit==1.8.6 bandit -q -ll -ii -r agent/xlsliberator
+              uv export --locked --no-dev --no-emit-project \
+                --format requirements-txt --output-file /workspace/requirements.txt
+              uvx --from pip-audit==2.9.0 pip-audit \
+                --requirement /workspace/requirements.txt \
+                --disable-pip \
+                --progress-spinner off
+            '
       - name: Start trusted LibreOffice MCP orchestrator
         working-directory: xlsliberator
         run: |
@@ -95,6 +159,8 @@ jobs:
           exit 1
       - name: Run Docker-only sandbox smoke
         run: |
+          # Explicit trusted CI health capability: this is not the migration-task
+          # sandbox default and passes no MCP credential into workbook execution.
           docker run --rm \
             --network host \
             --cpus 2 \

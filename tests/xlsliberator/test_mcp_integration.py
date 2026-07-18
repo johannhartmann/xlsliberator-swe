@@ -270,6 +270,40 @@ async def test_build_farm_tools_require_repair_flow_authority() -> None:
 
 
 @pytest.mark.asyncio
+async def test_security_adversary_has_no_hidden_or_build_farm_tools() -> None:
+    async def loader(config: MCPServiceConfig) -> list[BaseTool]:
+        names = {
+            "runtime": ["inspect_document"],
+            "corpus": ["run_public_suite", "run_hidden_acceptance"],
+            "buildfarm": ["apply_patch"],
+        }
+        return [_tool(name) for name in names[config.name]]
+
+    registry = await load_migration_mcp_registry(
+        _settings(
+            runtime="http://runtime:8000/mcp",
+            corpus="http://corpus:8000/mcp",
+            buildfarm="http://build-farm:8000/mcp",
+        ),
+        env={},
+        include_hidden=True,
+        loader=loader,
+    )
+
+    names = {
+        tool.name
+        for tool in registry.tools_for_role(
+            "security-adversary",
+            build_farm_authorized=True,
+        )
+    }
+    assert names == {
+        "xlsliberator_runtime_inspect_document",
+        "xlsliberator_corpus_run_public_suite",
+    }
+
+
+@pytest.mark.asyncio
 async def test_discovery_is_namespaced_and_health_is_safe_for_thread_metadata() -> None:
     async def loader(config: MCPServiceConfig) -> list[BaseTool]:
         names = {

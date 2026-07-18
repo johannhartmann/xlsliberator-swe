@@ -33,6 +33,10 @@ from ..xlsliberator.migrations import (
     resolve_artifact,
     resolve_dependency_artifact,
 )
+from ..xlsliberator.security import (
+    CapabilityConfigurationError,
+    authorize_capabilities,
+)
 
 router = APIRouter(prefix="/api/xlsliberator/migrations", tags=["xlsliberator"])
 _AUTHORIZATION_HEADER = Header(default=None)
@@ -458,6 +462,16 @@ async def create_workbook_migration(
     _require_trigger_token(authorization)
     if not isinstance(owner_id, str) or not hmac.compare_digest(owner_id, body.owner_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "owner identity does not match request")
+    try:
+        security_decision = authorize_capabilities(
+            body.required_capabilities,
+            role="lead",
+        )
+    except CapabilityConfigurationError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "secure capability policy is unavailable",
+        ) from exc
     thread_id = deterministic_thread_id(body)
     current_delivery = delivery_id(body)
     client = langgraph_client()
@@ -470,6 +484,7 @@ async def create_workbook_migration(
         "source_sha256": body.artifact.sha256.lower(),
         "original_filename": body.artifact.original_filename,
         "privacy_retention": body.privacy_retention.model_dump(mode="json"),
+        "xlsliberator_security": security_decision.model_dump(mode="json"),
         "retention_expires_at": (
             datetime.now(UTC) + timedelta(days=body.privacy_retention.retain_days)
         ).isoformat(),
@@ -479,6 +494,22 @@ async def create_workbook_migration(
         metadata=initial_metadata,
         if_exists="do_nothing",
     )
+    if security_decision.status == "UNAVAILABLE":
+        await client.threads.update(
+            thread_id=thread_id,
+            metadata={
+                "migration_status": "unavailable",
+                "migration_error": (
+                    "required secure execution capability is unavailable: "
+                    + ", ".join(capability.value for capability in security_decision.missing)
+                ),
+                "xlsliberator_security": security_decision.model_dump(mode="json"),
+            },
+        )
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "required secure execution capability is unavailable",
+        )
     thread = await client.threads.get(thread_id)
     existing = _thread_metadata(thread)
     if existing.get("migration_delivery_id") == current_delivery and existing.get(
@@ -525,6 +556,7 @@ async def create_workbook_migration(
         "dependency_locations": dependency_locations,
         "dossier_summary": hydrated.bounded_context.get("summary", {}),
         "target_libreoffice_version": body.target_libreoffice_version,
+        "xlsliberator_security": security_decision.model_dump(mode="json"),
     }
     await client.threads.update(thread_id=thread_id, metadata=metadata)
     configurable = {
@@ -532,6 +564,7 @@ async def create_workbook_migration(
         "source": "xlsliberator_api",
         "task_kind": TASK_KIND,
         "migration_context": hydrated.bounded_context,
+        "migration_security": security_decision.model_dump(mode="json"),
         "repo": {"owner": "johannhartmann", "name": "xlsliberator"},
     }
     try:

@@ -41,6 +41,7 @@ def test_specialist_catalog_has_required_roles_and_isolated_skill_views() -> Non
         "dependency-liberation-engineer",
         "libreoffice-engineer",
         "test-adversary",
+        "security-adversary",
         "failure-minimizer",
     )
     assert {profile.name: profile.skill_names for profile in SPECIALIST_PROFILES} == (
@@ -77,6 +78,10 @@ def test_tool_allowlists_drop_unrelated_and_hidden_tools() -> None:
     assert _tool_names(cast(dict[str, Any], by_name["test-adversary"])) == [
         "xlsliberator_corpus_run_public_suite",
     ]
+    assert _tool_names(cast(dict[str, Any], by_name["security-adversary"])) == [
+        "xlsliberator_runtime_inspect_document",
+        "xlsliberator_corpus_run_public_suite",
+    ]
     assert "xlsliberator_corpus_run_hidden_acceptance" not in {
         name for spec in specs for name in _tool_names(cast(dict[str, Any], spec))
     }
@@ -99,6 +104,22 @@ def test_filesystem_policy_prevents_test_adversary_from_writing_candidates() -> 
     assert "/workspace/migration/acceptance/**" in permissions[1].paths
     assert all("/candidates/" not in path for path in permissions[1].paths)
     assert permissions[-1].operations == ["write"]
+    assert permissions[-1].mode == "deny"
+
+
+def test_security_adversary_is_read_only_except_security_evidence() -> None:
+    security_adversary = next(
+        spec
+        for spec in build_migration_subagents(_model(), [])
+        if spec["name"] == "security-adversary"
+    )
+    permissions_value = security_adversary.get("permissions")
+    assert permissions_value is not None
+    permissions = cast(list[FilesystemPermission], permissions_value)
+
+    assert "/workspace/migration/evidence/security/**" in permissions[1].paths
+    assert all("/candidates/" not in path for path in permissions[1].paths)
+    assert all("/hidden/" not in path for path in permissions[1].paths)
     assert permissions[-1].mode == "deny"
 
 

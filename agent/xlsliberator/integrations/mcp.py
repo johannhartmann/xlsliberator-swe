@@ -223,6 +223,22 @@ ROLE_ALLOWLISTS: Mapping[str, Mapping[ServiceName, frozenset[str]]] = {
         ),
         "buildfarm": frozenset(),
     },
+    "security-adversary": {
+        "runtime": frozenset(
+            {
+                "create_session",
+                "open_document",
+                "inspect_document",
+                "read_cells",
+                "recalculate",
+                "execute_python_macro",
+                "collect_logs",
+                "destroy_session",
+            }
+        ),
+        "corpus": frozenset({"search_public_fixtures", "run_public_suite"}),
+        "buildfarm": frozenset(),
+    },
     "failure-minimizer": {
         "runtime": RUNTIME_TOOLS,
         "corpus": frozenset(

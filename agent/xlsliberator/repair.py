@@ -73,9 +73,7 @@ class IndependentRepairReview(BaseModel):
     reviewer: str = Field(min_length=1, max_length=200)
     implementation_owner: str = Field(min_length=1, max_length=200)
     verdict: Literal["APPROVE"]
-    evidence_path: str = Field(
-        pattern=r"^migration/repairs/[a-z0-9][a-z0-9-]+/review/.+"
-    )
+    evidence_path: str = Field(pattern=r"^migration/repairs/[a-z0-9][a-z0-9-]+/review/.+")
     hidden_definitions_included: Literal[False] = False
 
     @model_validator(mode="after")
@@ -202,11 +200,7 @@ class RepairPromotionWorkflow:
                     if libreoffice is not None
                     else payload["libreoffice"]
                 ),
-                "review": (
-                    review.model_dump(mode="json")
-                    if review is not None
-                    else payload["review"]
-                ),
+                "review": review.model_dump(mode="json") if review is not None else payload["review"],
             }
         )
 

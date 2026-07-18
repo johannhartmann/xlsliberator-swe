@@ -24,8 +24,8 @@ runtime-enriched identity to
 payload in thread metadata.
 
 The image contains no provider, GitHub, LangSmith, or service credentials.
-Runtime services inject short-lived credentials or proxy access outside the
-image.
+Workbook jobs do not inherit them. Trusted server-side services retain their
+own credentials and expose only role-authorized, task-scoped MCP operations.
 
 ## Build
 
@@ -61,7 +61,7 @@ The build installs:
 ## Smoke test
 
 Start the trusted XLSLiberator MCP orchestrator from the pinned XLSLiberator
-checkout, then run the sandbox smoke on the host network:
+checkout, then run the explicit CI health smoke on the host network:
 
 ```bash
 docker compose -f ../xlsliberator/docker-compose.yml up -d --build xlsliberator-mcp
@@ -71,7 +71,9 @@ docker run --rm --network host \
   xlsliberator-sandbox-smoke
 ```
 
-The smoke fails unless shell tools, both Python lines, LibreOffice, bundled
+This host-network command is an operator-authorized service health check, not a
+workbook-task default. It passes only the credential-free MCP endpoint. The
+smoke fails unless shell tools, both Python lines, LibreOffice, bundled
 PyUNO, the script provider, workbook CLIs, Xvfb screenshots, image identity,
 and a real FastMCP `list_tools` handshake all pass. A missing MCP endpoint is
 `UNAVAILABLE`, never success.
@@ -90,9 +92,41 @@ and a real FastMCP `list_tools` handshake all pass. A missing MCP endpoint is
 
 `/workspace` is the only durable writable job workspace. The image root is
 read-only in the development Compose profile; `/tmp` and `/home/sandbox` are
-bounded tmpfs mounts. Repository source mounts are read-only. Production
-providers must enforce equivalent controls; inability to enforce a required
-limit is `UNAVAILABLE`.
+bounded tmpfs mounts. Repository source mounts are read-only. The default
+Compose network is `none`, the Docker socket is absent, all Linux capabilities
+are dropped, privilege escalation is disabled, and PID 1 is an init process
+that reaps descendants. Each thread gets a disposable home and an isolated
+workspace; cleanup removes the job rather than reusing it across tenants.
+Production providers must enforce equivalent controls; inability to enforce a
+required limit is `UNAVAILABLE`.
+
+## Capability and adversary boundary
+
+Mail, database, HTTP, filesystem export, and build-farm access require explicit
+credential-free grants in `XLSLIBERATOR_CAPABILITY_GRANTS_JSON`. Grants are
+created by deployment policy, bound to an agent role and opaque adapter
+resource, and copied into `thread-metadata/xlsliberator_security`. Workbook or
+API content may declare a need but cannot grant itself authority. A missing
+grant returns `UNAVAILABLE` before workbook hydration.
+
+Network remains disabled inside the workbook container. Granted operations are
+performed by authenticated server-side adapters with curated MCP paths and
+role-specific tool allowlists. Only the LibreOffice engineer can receive
+build-farm mutation authority, and that still requires the separate repair-flow
+authorization. Implementation agents never receive reviewer hidden-test tools.
+
+Workbook cells, formulas, VBA, names, comments, external data, and tool output
+are delimited as untrusted data. They cannot select executables, mounts,
+endpoints, roles, tools, grants, or evidence verdicts. The
+`security-adversary` specialist is read-only except for
+`migration/evidence/security/**` and must report exactly twelve threat probes;
+an escape is `FAIL` and an unexercised required probe is `UNAVAILABLE`.
+
+CI runs an ordinary `xlsprobe` command under the networkless boundary, tests
+read-only root and credential absence, stops a container with a live child
+process to verify process-tree cleanup, and runs Bandit plus `pip-audit` from
+inside Docker. The audit's outbound advisory lookup is an explicit CI-only HTTP
+capability and is not available to workbook execution.
 
 ## LangSmith snapshot
 
@@ -127,3 +161,18 @@ the server's environment. It is unsuitable for workbook migration and never
 authorizes local Python, UNO, PyUNO, LibreOffice, or `soffice`. The
 `docker-compose.sandbox.yml` image is the Docker-only local-development
 surface.
+
+## Residual risk and production requirements
+
+Containers share the host kernel, so kernel or Docker-engine compromise,
+trusted orchestrator compromise, and previously unknown LibreOffice/parser
+vulnerabilities remain residual risks. Higher-assurance deployments should use
+an ephemeral VM or microVM boundary while preserving the same immutable image,
+resource limits, no-network default, per-job storage, and evidence contract.
+
+Production must authenticate the public migration API and every MCP service,
+authorize every tool by task and role, isolate tenant storage and encryption
+keys, enforce outbound allowlists at the adapter layer, use short-lived service
+credentials, verify immutable image digests, collect audit logs without
+workbook secrets, and delete expired workspaces. An isolated LibreOffice user
+profile alone is never considered a security sandbox.

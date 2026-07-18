@@ -50,6 +50,7 @@ SPECIALIST_SKILL_NAMES: dict[str, tuple[str, ...]] = {
     ),
     "libreoffice-engineer": ("libreoffice-debugging", "libreoffice-core-patching"),
     "test-adversary": ("migration-test-design", "migration-mutation-testing"),
+    "security-adversary": ("secure-workbook-execution", "migration-test-design"),
     "failure-minimizer": ("workbook-failure-minimization", "ods-package-surgery"),
 }
 

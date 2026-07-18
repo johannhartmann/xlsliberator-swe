@@ -23,6 +23,7 @@ from agent.xlsliberator.migrations import (
     WorkbookFollowUpRequest,
     WorkbookMigrationRequest,
 )
+from agent.xlsliberator.security import CapabilityName
 
 
 def _zip_bytes(content: bytes = b"<workbook/>") -> bytes:
@@ -241,6 +242,31 @@ async def test_trigger_hydrates_and_persists_sandbox_relative_locations(
         not path.startswith("/") for path in fake.threads.metadata["artifact_locations"].values()
     )
     assert "artifact_base64" not in json.dumps(fake.threads.metadata)
+
+
+@pytest.mark.asyncio
+async def test_trigger_missing_secure_capability_is_unavailable_before_hydration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = _zip_bytes()
+    body = _request(data, required_capabilities=[CapabilityName.HTTP])
+    fake = _FakeClient()
+    monkeypatch.setenv("XLSLIBERATOR_TRIGGER_TOKEN", "secret")
+    monkeypatch.setenv("XLSLIBERATOR_CAPABILITY_GRANTS_JSON", "[]")
+    monkeypatch.setattr(migration_api, "langgraph_client", lambda: fake)
+
+    async def must_not_hydrate(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("unavailable capability reached workbook hydration")
+
+    monkeypatch.setattr(migration_api, "hydrate_workbook", must_not_hydrate)
+
+    with pytest.raises(HTTPException) as error:
+        await migration_api.create_workbook_migration(body, "Bearer secret", "tenant-1")
+
+    assert error.value.status_code == 503
+    assert fake.threads.metadata["migration_status"] == "unavailable"
+    assert fake.threads.metadata["xlsliberator_security"]["status"] == "UNAVAILABLE"
+    assert fake.threads.metadata["xlsliberator_security"]["missing"] == ["http"]
 
 
 class _FollowUpBackend:

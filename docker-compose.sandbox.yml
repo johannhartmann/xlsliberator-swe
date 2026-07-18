@@ -16,6 +16,7 @@ services:
         XLSLIBERATOR_SANDBOX_IMAGE: ${XLSLIBERATOR_SANDBOX_IMAGE:-ghcr.io/johannhartmann/xlsliberator-swe-sandbox:2026.07.0}
         LIBREOFFICE_BUILD: ${XLSLIBERATOR_LIBREOFFICE_VERSION:-26.2.4.2}
     init: true
+    network_mode: none
     read_only: true
     cap_drop:
       - ALL
