@@ -143,12 +143,14 @@ COPY --from=xlsliberator pyproject.toml README.md /opt/xlsliberator-source/
 COPY --from=xlsliberator src /opt/xlsliberator-source/src
 COPY --from=xlsliberator rules /opt/xlsliberator-source/rules
 COPY docker/xlsliberator-sandbox/xlsliberator-env/pyproject.toml \
-     /opt/xlsliberator-environment/pyproject.toml
+     docker/xlsliberator-sandbox/xlsliberator-env/uv.lock \
+     /opt/xlsliberator-environment/
 
 RUN test -n "${XLSLIBERATOR_SOURCE_COMMIT}" \
     && UV_PROJECT_ENVIRONMENT=/opt/xlsliberator-venv \
        uv sync \
          --project /opt/xlsliberator-environment \
+         --locked \
          --python /usr/local/bin/python3.12 \
          --no-install-project \
     && uv pip install \
@@ -158,6 +160,7 @@ RUN test -n "${XLSLIBERATOR_SOURCE_COMMIT}" \
     && chmod -R a-w /opt/xlsliberator-source
 
 COPY docker/xlsliberator-sandbox/entrypoint.sh /usr/local/bin/xlsliberator-sandbox-entrypoint
+COPY docker/xlsliberator-sandbox/open-swe-python.sh /usr/local/bin/open-swe-python
 COPY docker/xlsliberator-sandbox/identity.sh /usr/local/bin/xlsliberator-sandbox-identity
 COPY docker/xlsliberator-sandbox/smoke.sh /usr/local/bin/xlsliberator-sandbox-smoke
 COPY docker/xlsliberator-sandbox/mcp_smoke.py /opt/xlsliberator-sandbox/mcp_smoke.py
@@ -165,13 +168,13 @@ COPY docker/xlsliberator-sandbox/build_farm_client.sh /usr/local/bin/xlsliberato
 
 RUN chmod 0555 \
       /usr/local/bin/xlsliberator-sandbox-entrypoint \
+      /usr/local/bin/open-swe-python \
       /usr/local/bin/xlsliberator-sandbox-identity \
       /usr/local/bin/xlsliberator-sandbox-smoke \
       /usr/local/bin/xlsliberator-build-farm-client \
       /opt/xlsliberator-sandbox/mcp_smoke.py \
       /opt/open-swe/scripts/create_sandbox_snapshot.py \
     && ln -s /opt/libreoffice26.2/program/soffice /usr/local/bin/soffice \
-    && ln -s /opt/open-swe-venv/bin/python /usr/local/bin/open-swe-python \
     && mkdir -p /etc/xlsliberator-sandbox /workspace /home/sandbox /tmp/home \
     && jq -n \
       --arg image "${XLSLIBERATOR_SANDBOX_IMAGE}" \
