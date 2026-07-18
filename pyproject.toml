@@ -46,7 +46,12 @@ dev = [
 # conservative `deepagents<0.7.0` upper bound, but the 0.7.0 alpha keeps the
 # public API they rely on (SandboxBackendProtocol / BaseSandbox) backward
 # compatible. Override the transitive bound so we can track the latest alpha.
-override-dependencies = ["deepagents==0.7.0a7"]
+override-dependencies = [
+    "deepagents==0.7.0a7",
+    # grpcio-tools needs setuptools at runtime. Keep the security-fixed floor
+    # explicit so future lock refreshes cannot reintroduce PYSEC-2026-3447.
+    "setuptools>=83.0.0",
+]
 
 [build-system]
 requires = ["hatchling"]
