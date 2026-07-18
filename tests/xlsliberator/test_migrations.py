@@ -345,6 +345,9 @@ class _DeliveryBackend:
             "evidence/trajectories/formula.json": b'{"status":"complete"}',
             "evidence/hidden/cases.json": b'{"secret":"hidden"}',
             "logs/runtime.log": b"completed\n",
+            "public/replay/showcase.webm": b"\x1aE\xdf\xa3real-webm",
+            "public/replay/events.json": b'{"status":"passed"}',
+            "public/replay/index.html": b"<!doctype html><title>Showcase replay</title>",
             "unresolved.md": b"# Unresolved\n\nNone.\n",
             "reviewer/result.json": b'{"verdict":"APPROVE"}',
         }
@@ -399,9 +402,16 @@ async def test_status_events_and_artifacts_are_owner_scoped_and_sanitized(
         "save-reopen.json",
         "formula.json",
         "runtime.log",
+        "showcase.webm",
+        "events.json",
+        "index.html",
         "unresolved.md",
         "result.json",
     }
+    kinds = {artifact.name: artifact.kind for artifact in result.artifacts}
+    assert kinds["showcase.webm"] == "showcase-recording"
+    assert kinds["events.json"] == "showcase-result"
+    assert kinds["index.html"] == "showcase-replay"
     assert all("/workspace/" not in artifact.name for artifact in result.artifacts)
 
     events = await migration_api.get_workbook_migration_events(

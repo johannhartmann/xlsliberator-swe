@@ -222,6 +222,12 @@ def _artifact_kind(path: str) -> str | None:
         return None
     if path == "output/target.ods":
         return "ods"
+    if path == "public/replay/showcase.webm":
+        return "showcase-recording"
+    if path == "public/replay/events.json":
+        return "showcase-result"
+    if path == "public/replay/index.html":
+        return "showcase-replay"
     if path in {"dossier.md", "plan.md", "report.json", "report.md", "unresolved.md"}:
         return "report"
     if pure.parts[0] == "generated" and pure.suffix.lower() in {
