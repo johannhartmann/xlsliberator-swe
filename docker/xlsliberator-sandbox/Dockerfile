@@ -139,7 +139,9 @@ RUN UV_PROJECT_ENVIRONMENT=/opt/open-swe-venv \
       --no-install-project \
       --python /usr/local/bin/python3.12
 
-COPY --from=xlsliberator . /opt/xlsliberator-source
+COPY --from=xlsliberator pyproject.toml uv.lock README.md /opt/xlsliberator-source/
+COPY --from=xlsliberator src /opt/xlsliberator-source/src
+COPY --from=xlsliberator rules /opt/xlsliberator-source/rules
 
 RUN test -n "${XLSLIBERATOR_SOURCE_COMMIT}" \
     && UV_PROJECT_ENVIRONMENT=/opt/xlsliberator-venv \
