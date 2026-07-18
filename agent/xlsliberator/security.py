@@ -111,9 +111,7 @@ class SecurityProbe(BaseModel):
 
     threat: SecurityThreat
     status: Literal["BLOCKED", "ESCAPED", "UNAVAILABLE"]
-    evidence_path: str = Field(
-        pattern=r"^migration/evidence/security/[a-z0-9][a-z0-9._/-]{0,255}$"
-    )
+    evidence_path: str = Field(pattern=r"^migration/evidence/security/[a-z0-9][a-z0-9._/-]{0,255}$")
     detail: str = Field(min_length=1, max_length=1000)
 
     @model_validator(mode="after")

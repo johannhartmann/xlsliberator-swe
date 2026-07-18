@@ -200,7 +200,9 @@ class RepairPromotionWorkflow:
                     if libreoffice is not None
                     else payload["libreoffice"]
                 ),
-                "review": review.model_dump(mode="json") if review is not None else payload["review"],
+                "review": review.model_dump(mode="json")
+                if review is not None
+                else payload["review"],
             }
         )
 
