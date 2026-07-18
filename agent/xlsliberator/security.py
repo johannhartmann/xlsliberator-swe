@@ -218,7 +218,7 @@ def safe_sandbox_environment(source: dict[str, str]) -> dict[str, str]:
     clean.update(
         {
             "HOME": "/home/sandbox",
-            "TMPDIR": "/tmp",
+            "TMPDIR": "/tmp",  # nosec B108 - isolated container tmpfs, not a host temp path
             "XLSLIBERATOR_UNTRUSTED_WORKBOOK": "1",
         }
     )

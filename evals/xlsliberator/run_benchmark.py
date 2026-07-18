@@ -46,7 +46,9 @@ def _load_observations(payload: object) -> list[MigrationEvaluationInput]:
     raw_observations = payload.get("observations")
     if not isinstance(raw_observations, list):
         raise ValueError("benchmark response must contain observations")
-    return [MigrationEvaluationInput.model_validate(observation) for observation in raw_observations]
+    return [
+        MigrationEvaluationInput.model_validate(observation) for observation in raw_observations
+    ]
 
 
 def _request_observations(
