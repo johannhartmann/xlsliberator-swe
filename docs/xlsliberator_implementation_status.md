@@ -55,7 +55,7 @@ also passed.
 | Prompt | Status | Acceptance evidence |
 |---:|---|---|
 | 07 — thin Open-SWE fork | COMPLETE; REMOTE CI GREEN AT `27d2aa19` | retained history, typed settings, namespace, full preserved CI, upstream drift and sync procedure |
-| 08 — sandbox snapshot | PENDING | image identity, SBOM, tool versions, sandbox smoke |
+| 08 — sandbox snapshot | COMPLETE; REMOTE CI GREEN AT `84d22454` | Docker-only image build, immutable dependency locks, exact LibreOffice `26.2.4.2`, PyUNO/runtime tool smoke, MCP connectivity, identity, secret scan and SPDX SBOM in [run 29651333157](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651333157) |
 | 09 — triggers and hydration | PENDING | deterministic threads, attachment safety, durable artifact evidence |
 | 10 — Deep Agents skills | PENDING | progressive disclosure, precedence, skill lint |
 | 11 — core migration skills | PENDING IN `xlsliberator` | forensics, planning, testing, and package skill evidence |
@@ -74,5 +74,5 @@ also passed.
 
 ## Next action
 
-Complete Prompt 08 by building and smoke-testing the versioned Docker-only
-workbook migration sandbox.
+Complete Prompt 09 by adding safe workbook triggers, persistent sandbox
+hydration, bounded dossier context, follow-ups, cancellation and cleanup.

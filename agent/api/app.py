@@ -14,6 +14,7 @@ from ..webhooks.github_routes import router as github_webhook_router
 from ..webhooks.linear_routes import router as linear_webhook_router
 from ..webhooks.slack_routes import router as slack_webhook_router
 from .health import router as health_router
+from .xlsliberator import router as xlsliberator_router
 
 
 @asynccontextmanager
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(slack_webhook_router)
     app.include_router(health_router)
     app.include_router(github_webhook_router)
+    app.include_router(xlsliberator_router)
     return app
 
 

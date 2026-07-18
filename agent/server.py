@@ -153,6 +153,7 @@ from .utils.sandbox_state import (
     unwrap_sandbox_backend,
 )
 from .utils.tracing import AGENT_TRACING_PROJECT, traced_graph_factory
+from .xlsliberator.middleware import WorkbookAttachmentMiddleware
 
 client = get_client()
 
@@ -1009,6 +1010,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                     plan_mode=plan_mode,
                     corridor_enabled=bool(corridor_tools),
                 ),
+                WorkbookAttachmentMiddleware(configurable),
                 SanitizeToolInputsMiddleware(),
                 ModelCallLimitMiddleware(run_limit=MODEL_CALL_RECURSION_LIMIT, exit_behavior="end"),
                 ToolErrorMiddleware(),
