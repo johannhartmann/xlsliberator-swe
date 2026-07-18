@@ -136,6 +136,7 @@ SPECIALIST_PROFILES: tuple[SpecialistProfile, ...] = (
         skill_names=("vba-to-python-uno", "migration-test-design"),
         tool_names=(
             "xlsliberator_runtime_inspect_document",
+            "xlsliberator_runtime_build_interactive_game_target",
             "xlsliberator_runtime_execute_python_macro",
             "xlsliberator_runtime_dispatch_control_event",
             "xlsliberator_runtime_send_keyboard_event",
@@ -163,6 +164,8 @@ SPECIALIST_PROFILES: tuple[SpecialistProfile, ...] = (
         skill_names=("userform-to-uno", "activex-to-open-controls", "visual-validation"),
         tool_names=(
             "xlsliberator_runtime_list_controls",
+            "xlsliberator_runtime_run_interactive_game_scenario",
+            "xlsliberator_runtime_bundle_interactive_game_replays",
             "xlsliberator_runtime_dispatch_control_event",
             "xlsliberator_runtime_send_keyboard_event",
             "xlsliberator_runtime_capture_screenshot",
@@ -248,6 +251,8 @@ SPECIALIST_PROFILES: tuple[SpecialistProfile, ...] = (
         skill_names=("migration-test-design", "migration-mutation-testing"),
         tool_names=(
             "xlsliberator_runtime_open_document",
+            "xlsliberator_runtime_run_interactive_game_scenario",
+            "xlsliberator_runtime_bundle_interactive_game_replays",
             "xlsliberator_runtime_read_cells",
             "xlsliberator_runtime_recalculate",
             "xlsliberator_runtime_dispatch_control_event",

@@ -11,6 +11,8 @@ from agent.dashboard.options import (
     default_model_pair,
     fable_disabled_fallback,
     gate_fable_model,
+    model_default_effort,
+    model_supports_reasoning,
     provider_fallback_pair,
 )
 from agent.dashboard.profiles import ProfileUpdate, normalize_profile_for_response
@@ -49,7 +51,13 @@ def test_supported_openai_models_include_gpt_5_5_and_gpt_5_6() -> None:
         ("openai:gpt-5.6-sol", "GPT-5.6 Sol"),
         ("openai:gpt-5.6-terra", "GPT-5.6 Terra"),
         ("openai:gpt-5.6-luna", "GPT-5.6 Luna"),
+        ("openai:openai/gpt-4.1", "GitHub Models GPT-4.1"),
     ]
+
+
+def test_github_models_gpt_4_1_has_non_reasoning_profile() -> None:
+    assert model_default_effort("openai:openai/gpt-4.1") == "none"
+    assert model_supports_reasoning("openai:openai/gpt-4.1") is False
 
 
 @pytest.mark.parametrize("model_id", ["unknown:model", "no-colon", "", None, 123])

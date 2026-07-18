@@ -54,6 +54,7 @@ from .dashboard.agent_usage import record_agent_thread_usage
 from .dashboard.options import (
     SUPPORTED_MODEL_IDS,
     gate_fable_model,
+    model_default_effort,
     model_supports_effort,
 )
 from .dashboard.repo_snapshots import resolve_repo_snapshot_id
@@ -841,6 +842,8 @@ async def get_agent(config: RunnableConfig) -> Pregel:
             tools=[],
         ).with_config(config)
 
+    is_migration = configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND
+    migration_settings = XLSLiberatorSettings.from_env() if is_migration else None
     profile_login = resolve_github_login(as_json_object(config))
     # Team/profile settings are accepted stale for a short TTL so graph factories
     # stay off the critical path during worker load and retry storms.
@@ -912,6 +915,29 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         subagent_model_id = per_thread_model
         subagent_effort = per_thread_effort
 
+    if migration_settings is not None:
+        migration_effort = model_default_effort(migration_settings.primary_model)
+        specialist_effort = model_default_effort(migration_settings.specialist_model)
+        if migration_effort is None:
+            raise ValueError(
+                "XLSLIBERATOR_PRIMARY_MODEL must identify a supported model: "
+                f"{migration_settings.primary_model}"
+            )
+        if specialist_effort is None:
+            raise ValueError(
+                "XLSLIBERATOR_SPECIALIST_MODEL must identify a supported model: "
+                f"{migration_settings.specialist_model}"
+            )
+        model_id = migration_settings.primary_model
+        profile_effort = migration_effort
+        subagent_model_id = migration_settings.specialist_model
+        subagent_effort = specialist_effort
+        logger.info(
+            "Using XLSLiberator migration models: primary=%s specialist=%s",
+            model_id,
+            subagent_model_id,
+        )
+
     always_create_prs = profile_create_prs(profile)
     if always_create_prs:
         logger.info("Always Create PRs enabled by profile for %s", profile_login)
@@ -974,10 +1000,9 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     migration_evaluation_middleware: list[Any] = []
     migration_guard_middleware: list[AgentMiddleware[Any, Any, Any]] = []
     migration_mcp_registry: MigrationMCPRegistry | None = None
-    migration_settings: XLSLiberatorSettings | None = None
-    is_migration = configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND
     if is_migration:
-        migration_settings = XLSLiberatorSettings.from_env()
+        if migration_settings is None:
+            raise RuntimeError("migration settings were not initialized")
         migration_mcp_registry = await load_migration_mcp_registry(migration_settings)
         migration_mcp_registry = bridge_migration_mcp_registry(
             migration_mcp_registry,

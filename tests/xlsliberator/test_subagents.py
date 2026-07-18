@@ -65,6 +65,9 @@ def test_tool_allowlists_drop_unrelated_and_hidden_tools() -> None:
         _model(),
         _tools(
             "xlsliberator_runtime_inspect_document",
+            "xlsliberator_runtime_build_interactive_game_target",
+            "xlsliberator_runtime_run_interactive_game_scenario",
+            "xlsliberator_runtime_bundle_interactive_game_replays",
             "xlsliberator_corpus_run_public_suite",
             "xlsliberator_corpus_run_hidden_acceptance",
             "xlsliberator_buildfarm_apply_patch",
@@ -76,6 +79,8 @@ def test_tool_allowlists_drop_unrelated_and_hidden_tools() -> None:
         "xlsliberator_runtime_inspect_document"
     ]
     assert _tool_names(cast(dict[str, Any], by_name["test-adversary"])) == [
+        "xlsliberator_runtime_run_interactive_game_scenario",
+        "xlsliberator_runtime_bundle_interactive_game_replays",
         "xlsliberator_corpus_run_public_suite",
     ]
     assert _tool_names(cast(dict[str, Any], by_name["security-adversary"])) == [

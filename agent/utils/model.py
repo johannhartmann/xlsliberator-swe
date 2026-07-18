@@ -1,13 +1,16 @@
 import asyncio
 import os
 from typing import Any, Literal, TypedDict, Unpack, cast
+from urllib.parse import urlsplit
 
 from langchain.chat_models import init_chat_model
 
-from ..dashboard.options import DEFAULT_MODEL_ID
+from ..dashboard.options import DEFAULT_MODEL_ID, model_supports_reasoning
 from .gateway import gateway_env_default, gateway_overrides
 
 OPENAI_RESPONSES_WS_BASE_URL = "wss://api.openai.com/v1"
+OPENAI_BASE_URL_ENV = "OPENAI_BASE_URL"
+OPENAI_USE_RESPONSES_API_ENV = "OPENAI_USE_RESPONSES_API"
 
 # Anthropic SDK default is 2; a 529 burst can outlive that. Bump to give the
 # primary provider a fair chance before the fallback middleware kicks in.
@@ -111,6 +114,34 @@ def _configure_openai_responses_kwargs(model_kwargs: dict[str, object]) -> None:
         include.append("reasoning.encrypted_content")
 
 
+def _direct_openai_defaults() -> tuple[str, bool]:
+    raw_base_url = os.environ.get(OPENAI_BASE_URL_ENV, "").strip()
+    raw_responses = os.environ.get(OPENAI_USE_RESPONSES_API_ENV, "").strip().lower()
+    if not raw_base_url:
+        if raw_responses:
+            raise ValueError(
+                f"{OPENAI_USE_RESPONSES_API_ENV} requires {OPENAI_BASE_URL_ENV}"
+            )
+        return OPENAI_RESPONSES_WS_BASE_URL, True
+
+    parsed = urlsplit(raw_base_url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            f"{OPENAI_BASE_URL_ENV} must be a credential-free HTTPS URL "
+            "without query or fragment"
+        )
+    if raw_responses not in {"", "true", "false"}:
+        raise ValueError(f"{OPENAI_USE_RESPONSES_API_ENV} must be true or false")
+    return raw_base_url.rstrip("/"), raw_responses == "true"
+
+
 def make_model(model_id: str, *, use_gateway: bool | None = None, **kwargs: Unpack[ModelKwargs]):
     """Build a chat model, optionally routed through the LangSmith LLM Gateway.
 
@@ -123,10 +154,12 @@ def make_model(model_id: str, *, use_gateway: bool | None = None, **kwargs: Unpa
     model_kwargs.setdefault("max_retries", DEFAULT_MAX_RETRIES)
 
     if model_id.startswith("openai:"):
-        # Direct-provider default: Responses API over the OpenAI websocket base.
-        # Gateway routing overrides this below (an HTTP(S) proxy can't carry wss).
-        model_kwargs["base_url"] = OPENAI_RESPONSES_WS_BASE_URL
-        model_kwargs["use_responses_api"] = True
+        # Direct OpenAI defaults to Responses over its websocket endpoint.
+        # A deployment may instead select a credential-free HTTPS-compatible
+        # endpoint (for example GitHub Models) and Chat Completions explicitly.
+        base_url, use_responses_api = _direct_openai_defaults()
+        model_kwargs["base_url"] = base_url
+        model_kwargs["use_responses_api"] = use_responses_api
 
     enabled = gateway_env_default() if use_gateway is None else use_gateway
     if enabled:
@@ -164,6 +197,8 @@ def fallback_model_id_for(primary_model_id: str) -> str | None:
     """
     if primary_model_id.startswith("anthropic:"):
         return "openai:gpt-5.6-sol"
+    if primary_model_id.startswith("openai:openai/"):
+        return None
     if primary_model_id.startswith("openai:"):
         return "anthropic:claude-opus-4-8"
     return None
@@ -260,7 +295,7 @@ def provider_model_kwargs(
 ) -> ModelKwargs:
     """Build provider-specific kwargs for ``make_model`` from a model id and effort."""
     kwargs: ModelKwargs = {"max_tokens": max_tokens}
-    if model_id.startswith("openai:"):
+    if model_id.startswith("openai:") and model_supports_reasoning(model_id):
         reasoning = openai_reasoning_for(profile_effort)
         if reasoning is not None:
             kwargs["reasoning"] = reasoning

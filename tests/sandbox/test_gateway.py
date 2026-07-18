@@ -22,6 +22,8 @@ _GATEWAY_ENV_VARS = (
     "LANGSMITH_GATEWAY_ENABLED",
     "LANGSMITH_GATEWAY_BASE_URL",
     "LANGSMITH_GATEWAY_OPENAI_USE_RESPONSES",
+    "OPENAI_BASE_URL",
+    "OPENAI_USE_RESPONSES_API",
 )
 
 
@@ -339,6 +341,47 @@ def test_make_model_direct_openai_uses_responses_websocket() -> None:
     assert captured["store"] is False
     assert captured["include"] == ["reasoning.encrypted_content"]
     assert captured["output_version"] == "responses/v1"
+
+
+def test_make_model_direct_openai_compatible_endpoint_uses_chat_completions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://models.github.ai/inference")
+    monkeypatch.setenv("OPENAI_USE_RESPONSES_API", "false")
+    captured, fake = _capture_init_chat_model()
+    with patch.object(model, "init_chat_model", fake):
+        model.make_model("openai:openai/gpt-4.1", use_gateway=False)
+    assert captured["base_url"] == "https://models.github.ai/inference"
+    assert captured["use_responses_api"] is False
+    assert "store" not in captured
+    assert "include" not in captured
+    assert "output_version" not in captured
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://models.github.ai/inference",
+        "https://token@models.github.ai/inference",
+        "https://models.github.ai/inference?token=secret",
+    ],
+)
+def test_make_model_rejects_unsafe_openai_compatible_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    base_url: str,
+) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", base_url)
+    with pytest.raises(ValueError, match="credential-free HTTPS URL"):
+        model.make_model("openai:openai/gpt-4.1", use_gateway=False)
+
+
+def test_github_models_provider_kwargs_omit_reasoning() -> None:
+    kwargs = model.provider_model_kwargs(
+        "openai:openai/gpt-4.1",
+        "none",
+        max_tokens=32_768,
+    )
+    assert kwargs == {"max_tokens": 32_768}
 
 
 def test_make_model_gateway_openai_replaces_websocket(

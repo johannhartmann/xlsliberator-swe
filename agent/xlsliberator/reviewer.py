@@ -25,6 +25,7 @@ from langgraph.pregel import Pregel
 from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..dashboard.options import model_default_effort
 from ..dashboard.team_settings import get_effective_gateway_enabled
 from ..middleware import (
     SanitizeFireworksMessagesMiddleware,
@@ -354,9 +355,15 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
     if hidden_name not in {tool.name for tool in reviewer_tools}:
         logger.warning("Migration reviewer started without hidden acceptance capability")
 
+    reviewer_effort = model_default_effort(settings.reviewer_model)
+    if reviewer_effort is None:
+        raise ValueError(
+            "XLSLIBERATOR_REVIEWER_MODEL must identify a supported model: "
+            f"{settings.reviewer_model}"
+        )
     model_kwargs = provider_model_kwargs(
         settings.reviewer_model,
-        "high",
+        reviewer_effort,
         max_tokens=DEFAULT_LLM_MAX_TOKENS,
         openai_reasoning_default=DEFAULT_LLM_REASONING,
     )

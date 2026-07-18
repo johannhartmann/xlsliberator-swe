@@ -11,6 +11,7 @@ class ModelOption(TypedDict):
     efforts: list[str]
     default_effort: str
     supports_images: bool
+    supports_reasoning: NotRequired[bool]
     context_window: NotRequired[int | None]
 
 
@@ -70,6 +71,15 @@ SUPPORTED_MODELS: list[ModelOption] = [
         "default_effort": "xhigh",
         "supports_images": True,
         "context_window": 128_000,
+    },
+    {
+        "id": "openai:openai/gpt-4.1",
+        "label": "GitHub Models GPT-4.1",
+        "efforts": ["none"],
+        "default_effort": "none",
+        "supports_images": True,
+        "supports_reasoning": False,
+        "context_window": 1_048_576,
     },
     {
         "id": "google_genai:gemini-3.5-flash",
@@ -150,6 +160,22 @@ def model_supports_images(model_id: str) -> bool:
         if m["id"] == model_id:
             return m["supports_images"]
     return False
+
+
+def model_supports_reasoning(model_id: str) -> bool:
+    """Return whether provider reasoning kwargs are valid for this model."""
+    for model in SUPPORTED_MODELS:
+        if model["id"] == model_id:
+            return model.get("supports_reasoning", True)
+    return False
+
+
+def model_default_effort(model_id: str) -> str | None:
+    """Return the declared default effort for a supported model."""
+    for model in SUPPORTED_MODELS:
+        if model["id"] == model_id:
+            return model["default_effort"]
+    return None
 
 
 def _provider_of(model_id: str) -> str | None:
