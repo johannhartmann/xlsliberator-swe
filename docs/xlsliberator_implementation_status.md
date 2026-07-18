@@ -40,11 +40,21 @@ project code because Docker Desktop could not write its containerd metadata
 database (`input/output error`). No host Python, `uv`, UNO, LibreOffice, or
 `soffice` fallback was used.
 
+## Prompt 07 customized evidence
+
+The customized foundation at commit `27d2aa19` passed the complete preserved
+Open SWE workflow in
+[Agent CI run 29649931382](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29649931382):
+Ruff lint, format checking, BasedPyright, the complete unit suite, and the
+Playwright coding-workflow E2E test all passed. The separate
+[upstream-drift run 29649931415](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29649931415)
+also passed.
+
 ## Prompt checklist
 
 | Prompt | Status | Acceptance evidence |
 |---:|---|---|
-| 07 — thin Open-SWE fork | IMPLEMENTED; CUSTOMIZED REMOTE CI REQUIRED | retained history, typed settings, namespace, upstream drift and sync procedure |
+| 07 — thin Open-SWE fork | COMPLETE; REMOTE CI GREEN AT `27d2aa19` | retained history, typed settings, namespace, full preserved CI, upstream drift and sync procedure |
 | 08 — sandbox snapshot | PENDING | image identity, SBOM, tool versions, sandbox smoke |
 | 09 — triggers and hydration | PENDING | deterministic threads, attachment safety, durable artifact evidence |
 | 10 — Deep Agents skills | PENDING | progressive disclosure, precedence, skill lint |
@@ -64,5 +74,5 @@ database (`input/output error`). No host Python, `uv`, UNO, LibreOffice, or
 
 ## Next action
 
-Complete Prompt 07 remote CI against the customized branch, then begin Prompt
-08 by building the versioned Docker-only workbook migration sandbox.
+Complete Prompt 08 by building and smoke-testing the versioned Docker-only
+workbook migration sandbox.
