@@ -57,15 +57,15 @@ also passed.
 | 07 — thin Open-SWE fork | COMPLETE; REMOTE CI GREEN AT `27d2aa19` | retained history, typed settings, namespace, full preserved CI, upstream drift and sync procedure |
 | 08 — sandbox snapshot | COMPLETE; REMOTE CI GREEN AT `84d22454` | Docker-only image build, immutable dependency locks, exact LibreOffice `26.2.4.2`, PyUNO/runtime tool smoke, MCP connectivity, identity, secret scan and SPDX SBOM in [run 29651333157](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651333157) |
 | 09 — triggers and hydration | COMPLETE; REMOTE CI GREEN AT `f513e485` | deterministic threads, fail-closed attachment safety, durable sandbox hydration, bounded dossier context, resume/cancel/cleanup, full Agent CI in [run 29651655678](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651655678) and Docker-only sandbox evidence in [run 29651655701](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651655701) |
-| 10 — Deep Agents skills | IMPLEMENTED; CI EVIDENCE PENDING | progressive disclosure, precedence, skill lint |
+| 10 — Deep Agents skills | COMPLETE; REMOTE SANDBOX CI GREEN AT `9228c3aa` | progressive disclosure, precedence, skill lint and migration-only wiring |
 | 11 — core migration skills | COMPLETE IN `xlsliberator` | production forensics, planning, testing, package and security skills; full CI in [run 29652794341](https://github.com/johannhartmann/xlsliberator/actions/runs/29652794341) |
 | 12 — specialist skills | COMPLETE IN `xlsliberator` | formula, VBA, UI, dependency, adapter, debugging and core-patching skills; full CI in [run 29652794341](https://github.com/johannhartmann/xlsliberator/actions/runs/29652794341) |
-| 13 — specialist routing | PENDING | isolated specialist scopes and model routing |
-| 14 — curated MCP tools | PENDING | allowlists, typed unavailable states, integration traces |
-| 15 — deterministic middleware | PENDING | checkpoints and anti-fake-success gates |
-| 16 — migration lead | PENDING | workflow and end-to-end trajectory |
-| 17 — independent reviewer | PENDING | independent identity and hidden-test gate |
-| 18 — web threads | PENDING | job/thread mapping, resume, artifact delivery |
+| 13 — specialist routing | COMPLETE AT `886a23dc` | isolated specialist scopes, artifacts, budgets and model routing |
+| 14 — curated MCP tools | COMPLETE; REMOTE CI GREEN AT `37c52efa` | allowlists, typed unavailable states, integration traces; Agent and sandbox runs `29653378974` and `29653378972` |
+| 15 — deterministic middleware | COMPLETE AT `49164719` | ordered checkpoints, resume, mutation and anti-fake-success gates |
+| 16 — migration lead | COMPLETE AT `18e0d770` | deterministic lead trajectory, feature routing and terminal evidence contract |
+| 17 — independent reviewer | COMPLETE; REMOTE CI GREEN AT `7c7ee4c8` | independent identity, read-only review, hidden-test and artifact-digest approval gate; Agent and sandbox runs `29654989184` and `29654989178` |
+| 18 — web threads | IMPLEMENTED; CI EVIDENCE PENDING | authenticated owner-scoped status/events/messages/artifacts/final API, deterministic thread mapping, retention, safe publication and fake-service integration |
 | 19 — demos and corpus | PENDING | representative public episodes |
 | 20 — repair promotion | PENDING | repair PR flow and build-farm boundary |
 | 21 — execution hardening | PENDING | sandbox, network, secret, and retention controls |
@@ -74,5 +74,5 @@ also passed.
 
 ## Next action
 
-Complete Prompt 10 by validating and wiring progressively disclosed,
-precedence-aware skills for workbook-migration runs only.
+Obtain blocking CI evidence for Prompt 18, then add the serious public demo and
+corpus structure required by Prompt 19.

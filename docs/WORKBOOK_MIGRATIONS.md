@@ -8,8 +8,11 @@ text, formulas, or VBA source in the system prompt.
 
 ## API
 
-All routes require `Authorization: Bearer <XLSLIBERATOR_TRIGGER_TOKEN>`. The
-deployment must leave the routes unavailable when the token is not configured.
+All routes require `Authorization: Bearer <XLSLIBERATOR_TRIGGER_TOKEN>` and an
+`X-XLSLiberator-Owner` header. The owner must equal the request owner on create
+and the persisted thread owner thereafter. Cross-owner lookups return 404 so
+thread existence is not disclosed. The deployment must leave the routes
+unavailable when the token is not configured.
 
 - `POST /api/xlsliberator/migrations` creates or idempotently returns a
   migration. It accepts exactly one base64 upload or public artifact URL.
@@ -17,6 +20,14 @@ deployment must leave the routes unavailable when the token is not configured.
   resumes the same durable thread with requirements and/or a dependency.
 - `POST /api/xlsliberator/migrations/{thread_id}/cancel` cancels pending and
   running executions without silently deleting evidence.
+- `GET /api/xlsliberator/migrations/{thread_id}` returns safe operation status
+  and the fixed public artifact manifest.
+- `GET /api/xlsliberator/migrations/{thread_id}/events?since=N` streams stable
+  lead, plan, specialist, LibreOffice, reviewer, and final stages.
+- `GET /api/xlsliberator/migrations/{thread_id}/artifacts` lists opaque artifact
+  IDs; `.../artifacts/{artifact_id}` downloads one owner-checked artifact.
+- `GET /api/xlsliberator/migrations/{thread_id}/final` returns only after a
+  terminal state.
 - `DELETE /api/xlsliberator/migrations/{thread_id}` explicitly removes the
   source and dossier from the persistent sandbox.
 
@@ -25,6 +36,8 @@ filename, caller-supplied SHA-256, user requirements, dependency metadata,
 output restrictions, LibreOffice profile and exact build `26.2.4.2`, and a
 privacy/retention policy. A tenant-scoped UUIDv5 of the source SHA-256 produces
 the stable thread ID. A separate delivery digest makes retries idempotent.
+API responses never expose the sandbox-relative paths retained in private
+thread metadata.
 
 ## Hydration and safety
 
@@ -41,6 +54,20 @@ runs inside the versioned Docker sandbox and transactionally creates
 such as `source/...` and `migration/`, never host paths or signed source URLs.
 The same sandbox ID remains bound to the thread, so follow-ups resume with the
 same dossier.
+
+Completion requires the dossier, plan, ODS, public acceptance scenarios,
+LibreOffice execution evidence, save/reopen evidence, unresolved inventory,
+and independent reviewer result. When the policy requests source deletion,
+`/workspace/source` and `/workspace/dependencies` are removed before the API
+reports `complete`. The API persists an absolute expiry from `retain_days`;
+expired workspaces are deleted and return 410.
+
+Only an explicit publication allowlist can be downloaded: the ODS, generated
+Python/UNO or service/extension artifacts, reports, public tests and
+trajectories, LibreOffice/reviewer evidence, visual evidence, and logs. Unsafe
+names, internal/hidden paths, oversized files, credentials, hidden-case
+material, system prompts, and private reasoning fail closed. Internal paths in
+otherwise safe text artifacts are redacted.
 
 Workbook content, VBA comments, formulas, extracted text, attachment names and
 dependency content are always untrusted data. The model sees only a bounded

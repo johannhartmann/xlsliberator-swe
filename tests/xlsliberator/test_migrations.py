@@ -5,11 +5,13 @@ import hashlib
 import io
 import json
 import zipfile
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
 import httpx
 import pytest
+from fastapi import HTTPException
 
 from agent.api import xlsliberator as migration_api
 from agent.xlsliberator import migrations
@@ -149,8 +151,11 @@ class _FakeThreads:
 
 
 class _FakeRuns:
+    def __init__(self, statuses: list[dict[str, Any]] | None = None) -> None:
+        self.statuses = statuses or []
+
     async def list(self, _thread_id: str) -> list[dict[str, Any]]:
-        return []
+        return self.statuses
 
     async def cancel_many(self, *, thread_id: str, run_ids: list[str]) -> None:
         assert thread_id
@@ -186,7 +191,9 @@ async def test_duplicate_delivery_does_not_start_another_run(
         raise AssertionError("duplicate delivery dispatched a second run")
 
     monkeypatch.setattr(migration_api, "dispatch_agent_run", must_not_dispatch)
-    result = await migration_api.create_workbook_migration(body, "Bearer secret")
+    result = await migration_api.create_workbook_migration(
+        body, "Bearer secret", "tenant-1"
+    )
     assert result.duplicate is True
     assert result.run_id == "run-1"
 
@@ -227,11 +234,17 @@ async def test_trigger_hydrates_and_persists_sandbox_relative_locations(
     monkeypatch.setattr(migration_api, "hydrate_workbook", hydrated)
     monkeypatch.setattr(migration_api, "dispatch_agent_run", dispatch)
 
-    result = await migration_api.create_workbook_migration(body, "Bearer secret")
+    result = await migration_api.create_workbook_migration(
+        body, "Bearer secret", "tenant-1"
+    )
     assert result.duplicate is False
     assert result.run_id == "run-2"
-    assert result.artifact_locations["source"] == "source/book.xlsx"
-    assert all(not path.startswith("/") for path in result.artifact_locations.values())
+    assert result.artifact_locations == {}
+    assert fake.threads.metadata["artifact_locations"]["source"] == "source/book.xlsx"
+    assert all(
+        not path.startswith("/")
+        for path in fake.threads.metadata["artifact_locations"].values()
+    )
     assert "artifact_base64" not in json.dumps(fake.threads.metadata)
 
 
@@ -266,6 +279,7 @@ async def test_follow_up_attachment_resumes_same_thread(
     fake = _FakeClient(
         {
             "task_kind": migrations.TASK_KIND,
+            "owner_id": "tenant-1",
             "artifact_locations": {"dossier": "migration/"},
         }
     )
@@ -286,10 +300,218 @@ async def test_follow_up_attachment_resumes_same_thread(
     monkeypatch.setattr(migration_api, "resolve_dependency_artifact", resolved)
     monkeypatch.setattr(migration_api, "_migration_backend", async_backend)
     monkeypatch.setattr(migration_api, "dispatch_agent_run", dispatch)
-    result = await migration_api.add_workbook_follow_up("thread-1", body, "Bearer secret")
+    result = await migration_api.add_workbook_follow_up(
+        "thread-1", body, "Bearer secret", "tenant-1"
+    )
     assert result.thread_id == "thread-1"
     assert result.run_id == "run-follow-up"
     assert backend.uploaded[0][0].startswith("/workspace/dependencies/")
     assert fake.threads.metadata["follow_up_requirements"] == [
         "Preserve the monthly import behavior."
     ]
+
+
+class _DeliveryBackend:
+    def __init__(self) -> None:
+        self.files = {
+            "dossier.md": b"# Dossier\n",
+            "plan.md": b"# Plan\n",
+            "output/target.ods": b"ods",
+            "acceptance/scenarios.json": b'{"scenarios":[]}',
+            "generated/bridge.py": b"def run(): return 1\n",
+            "evidence/libreoffice-execution.json": b'{"status":"passed"}',
+            "evidence/save-reopen.json": b'{"status":"passed"}',
+            "evidence/trajectories/formula.json": b'{"status":"complete"}',
+            "evidence/hidden/cases.json": b'{"secret":"hidden"}',
+            "logs/runtime.log": b"completed\n",
+            "unresolved.md": b"# Unresolved\n\nNone.\n",
+            "reviewer/result.json": b'{"verdict":"APPROVE"}',
+        }
+        self.commands: list[str] = []
+
+    async def aexecute(self, command: str, *, timeout: int) -> SimpleNamespace:
+        self.commands.append(command)
+        if command.startswith("find /workspace/migration"):
+            assert timeout == 30
+            output = "\n".join(
+                f"{path}\t{len(content)}" for path, content in self.files.items()
+            )
+            return SimpleNamespace(exit_code=0, output=output)
+        assert command == "rm -rf /workspace/source /workspace/dependencies"
+        assert timeout == 30
+        return SimpleNamespace(exit_code=0, output="")
+
+    async def adownload_files(self, paths: list[str]) -> list[dict[str, Any]]:
+        relative = paths[0].removeprefix("/workspace/migration/")
+        return [{"content": self.files[relative], "error": None}]
+
+
+@pytest.mark.asyncio
+async def test_status_events_and_artifacts_are_owner_scoped_and_sanitized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeClient(
+        {
+            "task_kind": migrations.TASK_KIND,
+            "owner_id": "tenant-1",
+            "migration_status": "running",
+            "migration_run_id": "run-1",
+        }
+    )
+    fake.runs.statuses = [{"run_id": "run-1", "status": "success"}]
+    backend = _DeliveryBackend()
+    monkeypatch.setenv("XLSLIBERATOR_TRIGGER_TOKEN", "secret")
+    monkeypatch.setattr(migration_api, "langgraph_client", lambda: fake)
+
+    async def delivery_backend(_thread_id: str) -> _DeliveryBackend:
+        return backend
+
+    monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
+
+    result = await migration_api.get_workbook_migration(
+        "thread-1", "Bearer secret", "tenant-1"
+    )
+    assert result.status == "complete"
+    assert {artifact.name for artifact in result.artifacts} == {
+        "dossier.md",
+        "plan.md",
+        "target.ods",
+        "scenarios.json",
+        "bridge.py",
+        "libreoffice-execution.json",
+        "save-reopen.json",
+        "formula.json",
+        "runtime.log",
+        "unresolved.md",
+        "result.json",
+    }
+    assert all("/workspace/" not in artifact.name for artifact in result.artifacts)
+
+    events = await migration_api.get_workbook_migration_events(
+        "thread-1", 0, "Bearer secret", "tenant-1"
+    )
+    assert events.events[-1].stage == "final"
+    assert all("path" not in event.message.lower() for event in events.events)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await migration_api.get_workbook_migration(
+            "thread-1", "Bearer secret", "tenant-2"
+        )
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_publication_check_blocks_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _DeliveryBackend()
+    backend.files["logs/runtime.log"] = b"Authorization: Bearer secret-token"
+
+    async def delivery_backend(_thread_id: str) -> _DeliveryBackend:
+        return backend
+
+    monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
+    artifact = next(
+        candidate
+        for candidate in await migration_api._public_artifacts("thread-1")
+        if candidate.summary.name == "runtime.log"
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await migration_api._artifact_bytes("thread-1", artifact)
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_publication_redacts_internal_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _DeliveryBackend()
+    backend.files["logs/runtime.log"] = b"opened /workspace/migration/output/target.ods\n"
+
+    async def delivery_backend(_thread_id: str) -> _DeliveryBackend:
+        return backend
+
+    monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
+    artifact = next(
+        candidate
+        for candidate in await migration_api._public_artifacts("thread-1")
+        if candidate.summary.name == "runtime.log"
+    )
+
+    content = await migration_api._artifact_bytes("thread-1", artifact)
+
+    assert b"/workspace/" not in content
+    assert b"[internal-path]" in content
+
+
+@pytest.mark.asyncio
+async def test_completion_deletes_private_sources_before_public_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeClient(
+        {
+            "task_kind": migrations.TASK_KIND,
+            "owner_id": "tenant-1",
+            "migration_status": "running",
+            "migration_run_id": "run-1",
+            "privacy_retention": {
+                "classification": "private",
+                "retain_days": 14,
+                "delete_source_after_completion": True,
+            },
+        }
+    )
+    fake.runs.statuses = [{"run_id": "run-1", "status": "success"}]
+    backend = _DeliveryBackend()
+    monkeypatch.setenv("XLSLIBERATOR_TRIGGER_TOKEN", "secret")
+    monkeypatch.setattr(migration_api, "langgraph_client", lambda: fake)
+
+    async def delivery_backend(_thread_id: str) -> _DeliveryBackend:
+        return backend
+
+    monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
+
+    result = await migration_api.get_workbook_migration(
+        "thread-1", "Bearer secret", "tenant-1"
+    )
+
+    assert result.status == "complete"
+    assert "rm -rf /workspace/source /workspace/dependencies" in backend.commands
+    assert isinstance(fake.threads.metadata.get("source_deleted_at"), str)
+
+
+@pytest.mark.asyncio
+async def test_expired_migration_is_cleaned_and_returns_gone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeClient(
+        {
+            "task_kind": migrations.TASK_KIND,
+            "owner_id": "tenant-1",
+            "migration_status": "running",
+            "retention_expires_at": (
+                datetime.now(UTC) - timedelta(seconds=1)
+            ).isoformat(),
+        }
+    )
+    monkeypatch.setenv("XLSLIBERATOR_TRIGGER_TOKEN", "secret")
+    monkeypatch.setattr(migration_api, "langgraph_client", lambda: fake)
+    cleaned: list[str] = []
+
+    async def backend(_thread_id: str) -> object:
+        return object()
+
+    async def cleanup(_backend: object) -> None:
+        cleaned.append("yes")
+
+    monkeypatch.setattr(migration_api, "_migration_backend", backend)
+    monkeypatch.setattr(migration_api, "cleanup_migration_workspace", cleanup)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await migration_api.get_workbook_migration(
+            "thread-1", "Bearer secret", "tenant-1"
+        )
+
+    assert exc_info.value.status_code == 410
+    assert cleaned == ["yes"]
+    assert fake.threads.metadata["migration_status"] == "cleaned"
