@@ -256,8 +256,7 @@ def _artifact_kind(path: str) -> str | None:
     }:
         return "evidence"
     if (
-        pure.parts[0] in {"regression", "tests"}
-        or pure.parts[:2] == ("evidence", "trajectories")
+        pure.parts[0] in {"regression", "tests"} or pure.parts[:2] == ("evidence", "trajectories")
     ) and pure.suffix.lower() in {".json", ".log", ".md", ".txt"}:
         return "evidence"
     return None

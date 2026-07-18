@@ -191,9 +191,7 @@ async def test_duplicate_delivery_does_not_start_another_run(
         raise AssertionError("duplicate delivery dispatched a second run")
 
     monkeypatch.setattr(migration_api, "dispatch_agent_run", must_not_dispatch)
-    result = await migration_api.create_workbook_migration(
-        body, "Bearer secret", "tenant-1"
-    )
+    result = await migration_api.create_workbook_migration(body, "Bearer secret", "tenant-1")
     assert result.duplicate is True
     assert result.run_id == "run-1"
 
@@ -234,17 +232,12 @@ async def test_trigger_hydrates_and_persists_sandbox_relative_locations(
     monkeypatch.setattr(migration_api, "hydrate_workbook", hydrated)
     monkeypatch.setattr(migration_api, "dispatch_agent_run", dispatch)
 
-    result = await migration_api.create_workbook_migration(
-        body, "Bearer secret", "tenant-1"
-    )
+    result = await migration_api.create_workbook_migration(body, "Bearer secret", "tenant-1")
     assert result.duplicate is False
     assert result.run_id == "run-2"
     assert result.artifact_locations == {}
     assert fake.threads.metadata["artifact_locations"]["source"] == "source/book.xlsx"
-    assert all(
-        not path.startswith("/")
-        for path in fake.threads.metadata["artifact_locations"].values()
-    )
+    assert all(not path.startswith("/") for path in fake.threads.metadata["artifact_locations"].values())
     assert "artifact_base64" not in json.dumps(fake.threads.metadata)
 
 
@@ -333,9 +326,7 @@ class _DeliveryBackend:
         self.commands.append(command)
         if command.startswith("find /workspace/migration"):
             assert timeout == 30
-            output = "\n".join(
-                f"{path}\t{len(content)}" for path, content in self.files.items()
-            )
+            output = "\n".join(f"{path}\t{len(content)}" for path, content in self.files.items())
             return SimpleNamespace(exit_code=0, output=output)
         assert command == "rm -rf /workspace/source /workspace/dependencies"
         assert timeout == 30
@@ -368,9 +359,7 @@ async def test_status_events_and_artifacts_are_owner_scoped_and_sanitized(
 
     monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
 
-    result = await migration_api.get_workbook_migration(
-        "thread-1", "Bearer secret", "tenant-1"
-    )
+    result = await migration_api.get_workbook_migration("thread-1", "Bearer secret", "tenant-1")
     assert result.status == "complete"
     assert {artifact.name for artifact in result.artifacts} == {
         "dossier.md",
@@ -394,9 +383,7 @@ async def test_status_events_and_artifacts_are_owner_scoped_and_sanitized(
     assert all("path" not in event.message.lower() for event in events.events)
 
     with pytest.raises(HTTPException) as exc_info:
-        await migration_api.get_workbook_migration(
-            "thread-1", "Bearer secret", "tenant-2"
-        )
+        await migration_api.get_workbook_migration("thread-1", "Bearer secret", "tenant-2")
     assert exc_info.value.status_code == 404
 
 
@@ -471,9 +458,7 @@ async def test_completion_deletes_private_sources_before_public_success(
 
     monkeypatch.setattr(migration_api, "_migration_backend", delivery_backend)
 
-    result = await migration_api.get_workbook_migration(
-        "thread-1", "Bearer secret", "tenant-1"
-    )
+    result = await migration_api.get_workbook_migration("thread-1", "Bearer secret", "tenant-1")
 
     assert result.status == "complete"
     assert "rm -rf /workspace/source /workspace/dependencies" in backend.commands
@@ -489,9 +474,7 @@ async def test_expired_migration_is_cleaned_and_returns_gone(
             "task_kind": migrations.TASK_KIND,
             "owner_id": "tenant-1",
             "migration_status": "running",
-            "retention_expires_at": (
-                datetime.now(UTC) - timedelta(seconds=1)
-            ).isoformat(),
+            "retention_expires_at": (datetime.now(UTC) - timedelta(seconds=1)).isoformat(),
         }
     )
     monkeypatch.setenv("XLSLIBERATOR_TRIGGER_TOKEN", "secret")
@@ -508,9 +491,7 @@ async def test_expired_migration_is_cleaned_and_returns_gone(
     monkeypatch.setattr(migration_api, "cleanup_migration_workspace", cleanup)
 
     with pytest.raises(HTTPException) as exc_info:
-        await migration_api.get_workbook_migration(
-            "thread-1", "Bearer secret", "tenant-1"
-        )
+        await migration_api.get_workbook_migration("thread-1", "Bearer secret", "tenant-1")
 
     assert exc_info.value.status_code == 410
     assert cleaned == ["yes"]
