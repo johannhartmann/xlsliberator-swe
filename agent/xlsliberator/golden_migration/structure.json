@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "privacy": "private",
+  "required_paths": [
+    "migration/dossier.md",
+    "migration/plan.md",
+    "migration/source/",
+    "migration/candidates/",
+    "migration/output/target.ods",
+    "migration/generated/",
+    "migration/acceptance/scenarios.json",
+    "migration/tests/",
+    "migration/logs/",
+    "migration/evidence/libreoffice-execution.json",
+    "migration/evidence/save-reopen.json",
+    "migration/evidence/mutations.json",
+    "migration/evidence/trajectories/",
+    "migration/evidence/visual/",
+    "migration/unresolved.md",
+    "migration/reviewer/result.json",
+    "migration/regression/",
+    "migration/checkpoints/"
+  ],
+  "terminal_statuses": [
+    "DELIVERABLE",
+    "UNRESOLVED"
+  ]
+}

@@ -162,6 +162,7 @@ from .xlsliberator.middleware import (
     migration_middleware_stack,
 )
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
+from .xlsliberator.prompt import prompt_for_task
 from .xlsliberator.settings import XLSLiberatorSettings
 from .xlsliberator.skills import MigrationSkillsMiddleware
 from .xlsliberator.subagents import subagents_for_task_kind
@@ -801,20 +802,24 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
                 "Failed to record agent usage for thread %s", self._thread_id, exc_info=True
             )
 
+        base_system_prompt = construct_system_prompt(
+            working_dir=work_dir,
+            linear_project_id=self._linear_project_id,
+            linear_issue_number=self._linear_issue_number,
+            triggering_user_identity=triggering_user_identity,
+            create_prs=self._create_prs,
+            default_repo=prompt_default_repo,
+            plan_mode=self._plan_mode,
+            plan_url=dashboard_plan_url(self._thread_id),
+            repo_custom_instructions=repo_custom_instructions,
+            thread_url=dashboard_thread_url(self._thread_id),
+            corridor_enabled=self._corridor_enabled,
+        )
         return {
             "work_dir": work_dir,
-            "rendered_system_prompt": construct_system_prompt(
-                working_dir=work_dir,
-                linear_project_id=self._linear_project_id,
-                linear_issue_number=self._linear_issue_number,
-                triggering_user_identity=triggering_user_identity,
-                create_prs=self._create_prs,
-                default_repo=prompt_default_repo,
-                plan_mode=self._plan_mode,
-                plan_url=dashboard_plan_url(self._thread_id),
-                repo_custom_instructions=repo_custom_instructions,
-                thread_url=dashboard_thread_url(self._thread_id),
-                corridor_enabled=self._corridor_enabled,
+            "rendered_system_prompt": prompt_for_task(
+                base_system_prompt,
+                task_kind=configurable.get("task_kind"),
             ),
         }
 
