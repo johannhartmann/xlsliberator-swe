@@ -341,7 +341,9 @@ def _validate_zip_structure(data: bytes) -> None:
                     raise WorkbookArtifactError("workbook package exceeds the expansion limit")
                 compressed = max(entry.compress_size, 1)
                 if entry.file_size / compressed > MAX_COMPRESSION_RATIO:
-                    raise WorkbookArtifactError("workbook package exceeds the compression ratio limit")
+                    raise WorkbookArtifactError(
+                        "workbook package exceeds the compression ratio limit"
+                    )
     except zipfile.BadZipFile as exc:
         raise WorkbookArtifactError("workbook package is not a valid ZIP archive") from exc
 
@@ -456,8 +458,8 @@ async def hydrate_workbook(
 
     marker_command = (
         "test -f /workspace/migration/source/summary.json "
-        "&& test \"$(jq -r .source_sha256 "
-        "/workspace/migration/source/summary.json)\" = "
+        '&& test "$(jq -r .source_sha256 '
+        '/workspace/migration/source/summary.json)" = '
         f"{shlex.quote(sha256)}"
     )
     marker = await backend.aexecute(marker_command, timeout=30)

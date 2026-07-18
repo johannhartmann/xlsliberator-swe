@@ -14,6 +14,7 @@ import pytest
 from agent.api import xlsliberator as migration_api
 from agent.xlsliberator import migrations
 from agent.xlsliberator.migrations import (
+    FollowUpArtifact,
     HydratedWorkbook,
     MigrationArtifact,
     WorkbookArtifactError,
@@ -32,13 +33,15 @@ def _zip_bytes(content: bytes = b"<workbook/>") -> bytes:
 
 def _request(data: bytes, **overrides: Any) -> WorkbookMigrationRequest:
     owner_id = overrides.pop("owner_id", "tenant-1")
-    artifact = {
-        "original_filename": "book.xlsx",
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "artifact_base64": base64.b64encode(data).decode(),
-    }
-    artifact.update(overrides.pop("artifact", {}))
+    artifact = MigrationArtifact.model_validate(
+        {
+            "original_filename": "book.xlsx",
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "artifact_base64": base64.b64encode(data).decode(),
+            **overrides.pop("artifact", {}),
+        }
+    )
     return WorkbookMigrationRequest(owner_id=owner_id, artifact=artifact, **overrides)
 
 
@@ -253,12 +256,12 @@ async def test_follow_up_attachment_resumes_same_thread(
     data = _zip_bytes()
     body = WorkbookFollowUpRequest(
         requirements="Preserve the monthly import behavior.",
-        dependency={
-            "original_filename": "dependency.xlsx",
-            "sha256": hashlib.sha256(data).hexdigest(),
-            "media_type": "application/octet-stream",
-            "artifact_base64": base64.b64encode(data).decode(),
-        },
+        dependency=FollowUpArtifact(
+            original_filename="dependency.xlsx",
+            sha256=hashlib.sha256(data).hexdigest(),
+            media_type="application/octet-stream",
+            artifact_base64=base64.b64encode(data).decode(),
+        ),
     )
     fake = _FakeClient(
         {
