@@ -47,9 +47,7 @@ _ALLOWED_ROLES: dict[CapabilityName, frozenset[SecurityRole]] = {
     CapabilityName.MAIL: frozenset({"lead", "dependency-liberation-engineer"}),
     CapabilityName.DATABASE: frozenset({"lead", "dependency-liberation-engineer"}),
     CapabilityName.HTTP: frozenset({"lead", "dependency-liberation-engineer"}),
-    CapabilityName.FILESYSTEM_EXPORT: frozenset(
-        {"lead", "dependency-liberation-engineer"}
-    ),
+    CapabilityName.FILESYSTEM_EXPORT: frozenset({"lead", "dependency-liberation-engineer"}),
     CapabilityName.BUILD_FARM: frozenset({"libreoffice-engineer"}),
 }
 

@@ -67,12 +67,12 @@ also passed.
 | 17 — independent reviewer | COMPLETE; REMOTE CI GREEN AT `7c7ee4c8` | independent identity, read-only review, hidden-test and artifact-digest approval gate; Agent and sandbox runs `29654989184` and `29654989178` |
 | 18 — web threads | COMPLETE; REMOTE CI GREEN AT `6a7f22bc` | authenticated owner-scoped status/events/messages/artifacts/final API, deterministic thread mapping, retention, safe publication and fake-service integration |
 | 19 — demos and corpus | COMPLETE IN `xlsliberator`; REMOTE CI GREEN AT `28a80f5` | eight licensed serious episodes, behavioral scenarios, searchable public subsets, evidence-derived reporting |
-| 20 — repair promotion | IMPLEMENTED ACROSS BOTH REPOSITORIES; OPEN-SWE CI FINALIZATION IN PROGRESS | exact eight-stage state machine, immutable layer classification, pinned LO identities, corpus/build-farm boundaries, validator and independent-review gates |
-| 21 — execution hardening | IMPLEMENTED; CI EVIDENCE PENDING | networkless read-only sandbox, server-owned typed grants, role-authorized MCP, twelve-probe security adversary, escape smoke, Docker Bandit and dependency audit |
-| 22 — LangSmith evaluations | PENDING | datasets, evaluators, thresholds, release gate |
+| 20 — repair promotion | COMPLETE; REMOTE MAIN CI GREEN AT `28a80f5`; OPEN-SWE FORMAT REPAIR INCLUDED IN `e2430a23` | exact eight-stage state machine, immutable layer classification, pinned LO identities, corpus/build-farm boundaries, validator and independent-review gates |
+| 21 — execution hardening | IMPLEMENTED AT `d0481087`; CI REPAIR PUSHED AS `e2430a23` | networkless read-only sandbox, server-owned typed grants, role-authorized MCP, twelve-probe security adversary, escape smoke, Docker Bandit and dependency audit; main repository fully green in run `29658220586` |
+| 22 — LangSmith evaluations | IMPLEMENTED; CI EVIDENCE PENDING | migration-only trace metadata, exactly fourteen deterministic evaluators, five-state public/hidden reports, format/feature/configuration grouping, fail-closed release decision, nightly approved-configuration benchmark |
 | 23 — autonomous showcase | PENDING | reproducible migration and independent verdict |
 
 ## Next action
 
-Obtain blocking CI evidence for Prompt 21, then implement the LangSmith
-evaluations, metrics, and release gates in Prompt 22.
+Obtain blocking CI evidence for Prompts 21 and 22, then execute the first full
+autonomous migration showcase in Prompt 23.

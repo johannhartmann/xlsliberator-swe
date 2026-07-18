@@ -1,0 +1,104 @@
+name: XLSLiberator nightly evaluations
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: xlsliberator-nightly-evaluations
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: Approved agent configurations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 390
+    env:
+      SANDBOX_IMAGE: xlsliberator-eval:${{ github.sha }}
+      OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
+      XLSLIBERATOR_SOURCE_COMMIT: d4412e974eab8dd6812b821b9535541e2d7ebcac
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: xlsliberator-swe
+      - uses: actions/checkout@v7
+        with:
+          repository: johannhartmann/xlsliberator
+          ref: d4412e974eab8dd6812b821b9535541e2d7ebcac
+          path: xlsliberator
+      - name: Build pinned LibreOffice image
+        working-directory: xlsliberator
+        run: |
+          docker build \
+            --tag "${OFFICE_IMAGE}" \
+            --file docker/office/libreoffice/Dockerfile \
+            .
+      - name: Build evaluation sandbox
+        working-directory: xlsliberator-swe
+        run: |
+          docker build \
+            --tag "${SANDBOX_IMAGE}" \
+            --build-context xlsliberator=../xlsliberator \
+            --build-arg "XLSLIBERATOR_OFFICE_IMAGE=${OFFICE_IMAGE}" \
+            --build-arg "OPEN_SWE_SOURCE_COMMIT=${GITHUB_SHA}" \
+            --build-arg "XLSLIBERATOR_SOURCE_COMMIT=${XLSLIBERATOR_SOURCE_COMMIT}" \
+            --build-arg "XLSLIBERATOR_SANDBOX_IMAGE=${SANDBOX_IMAGE}" \
+            --file docker/xlsliberator-sandbox/Dockerfile \
+            .
+      - name: Run server-side benchmark and deterministic evaluators
+        working-directory: xlsliberator-swe
+        env:
+          XLSLIBERATOR_BENCHMARK_ENDPOINT: ${{ secrets.XLSLIBERATOR_BENCHMARK_ENDPOINT }}
+          XLSLIBERATOR_BENCHMARK_TOKEN: ${{ secrets.XLSLIBERATOR_BENCHMARK_TOKEN }}
+        run: |
+          test -n "${XLSLIBERATOR_BENCHMARK_ENDPOINT}"
+          test -n "${XLSLIBERATOR_BENCHMARK_TOKEN}"
+          mkdir -p artifacts/evaluations
+          chmod 0777 artifacts/evaluations
+          docker run --rm \
+            --init \
+            --network bridge \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 128 \
+            --memory 2g \
+            --cpus 2 \
+            --volume "$PWD:/source:ro" \
+            --volume "$PWD/artifacts/evaluations:/output" \
+            --tmpfs /workspace:rw,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=0700 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=1777 \
+            --tmpfs /home/sandbox:rw,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=0700 \
+            --env "PYTHONPATH=/source" \
+            --env "XLSLIBERATOR_BENCHMARK_ENDPOINT=${XLSLIBERATOR_BENCHMARK_ENDPOINT}" \
+            --env "XLSLIBERATOR_BENCHMARK_TOKEN=${XLSLIBERATOR_BENCHMARK_TOKEN}" \
+            "${SANDBOX_IMAGE}" \
+            /opt/open-swe-venv/bin/python \
+            -m evals.xlsliberator.run_benchmark \
+            --output /output/nightly-report.json \
+            --check-release
+      - name: Verify hidden-test privacy and exact target identity
+        working-directory: xlsliberator-swe
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --volume "$PWD/artifacts/evaluations/nightly-report.json:/report.json:ro" \
+            --entrypoint /usr/bin/jq \
+            "${SANDBOX_IMAGE}" \
+            -e '
+              .target == "libreoffice"
+              and .target_libreoffice_build == "26.2.4.2"
+              and ([.hidden_by_configuration[].hidden_definitions_included] | all(. == false))
+            ' /report.json
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: xlsliberator-nightly-evaluations
+          path: xlsliberator-swe/artifacts/evaluations/nightly-report.json
+          if-no-files-found: error
+          retention-days: 30

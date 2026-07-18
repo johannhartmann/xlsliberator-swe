@@ -153,6 +153,7 @@ from .utils.sandbox_state import (
     unwrap_sandbox_backend,
 )
 from .utils.tracing import AGENT_TRACING_PROJECT, traced_graph_factory
+from .xlsliberator.evaluation import MigrationEvaluationTraceMiddleware
 from .xlsliberator.integrations.mcp import (
     MigrationMCPRegistry,
     load_migration_mcp_registry,
@@ -969,6 +970,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     corridor_tools = await _load_corridor_mcp_tools()
     browser_tools = load_browser_tools()
     migration_skills_middleware: list[Any] = []
+    migration_evaluation_middleware: list[Any] = []
     migration_guard_middleware: list[AgentMiddleware[Any, Any, Any]] = []
     migration_mcp_registry: MigrationMCPRegistry | None = None
     migration_settings: XLSLiberatorSettings | None = None
@@ -976,6 +978,9 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     if is_migration:
         migration_settings = XLSLiberatorSettings.from_env()
         migration_mcp_registry = await load_migration_mcp_registry(migration_settings)
+        migration_evaluation_middleware.append(
+            MigrationEvaluationTraceMiddleware(model_id)
+        )
         migration_skills_middleware.append(
             MigrationSkillsMiddleware(
                 backend=backend_factory,
@@ -1095,6 +1100,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                     ),
                 ),
                 WorkbookAttachmentMiddleware(configurable),
+                *migration_evaluation_middleware,
                 *migration_skills_middleware,
                 *migration_guard_middleware,
                 SanitizeToolInputsMiddleware(),
