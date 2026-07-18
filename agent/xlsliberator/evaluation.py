@@ -60,9 +60,7 @@ class EvaluatorResult(BaseModel):
     evaluator: EvaluatorName
     status: EvaluationStatus
     reason: str = Field(min_length=1, max_length=1000)
-    evidence_path: str = Field(
-        pattern=r"^migration/evidence/[a-z0-9][a-z0-9._/-]{0,255}$"
-    )
+    evidence_path: str = Field(pattern=r"^migration/evidence/[a-z0-9][a-z0-9._/-]{0,255}$")
     required: bool = True
     score: float | None = Field(default=None, ge=0.0, le=1.0)
 
@@ -230,9 +228,7 @@ def _partition_summary(
     return PartitionSummary(
         partition=partition,
         counts=counts,
-        decisive_pass_rate=(
-            counts[EvaluationStatus.PASSED] / decisive if decisive else None
-        ),
+        decisive_pass_rate=(counts[EvaluationStatus.PASSED] / decisive if decisive else None),
     )
 
 
@@ -282,9 +278,7 @@ def evaluate_migration(observed: MigrationEvaluationInput) -> MigrationEvaluatio
         ),
     )
 
-    validator_unchanged = (
-        observed.validator_sha256_before == observed.validator_sha256_after
-    )
+    validator_unchanged = observed.validator_sha256_before == observed.validator_sha256_after
     no_test_weakening = _result(
         observed,
         EvaluatorName.NO_TEST_WEAKENING,
@@ -324,13 +318,10 @@ def evaluate_migration(observed: MigrationEvaluationInput) -> MigrationEvaluatio
 
     if observed.mutation_status is EvaluationStatus.PASSED:
         mutation_rate = (
-            observed.mutation_killed / observed.mutation_total
-            if observed.mutation_total
-            else 0.0
+            observed.mutation_killed / observed.mutation_total if observed.mutation_total else 0.0
         )
         mutation_ok = (
-            observed.mutation_total > 0
-            and mutation_rate >= observed.required_mutation_kill_rate
+            observed.mutation_total > 0 and mutation_rate >= observed.required_mutation_kill_rate
         )
         mutation = _result(
             observed,
@@ -368,8 +359,7 @@ def evaluate_migration(observed: MigrationEvaluationInput) -> MigrationEvaluatio
         (
             "no VBA, Basic, COM, Windows, Excel, or proprietary add-in remains"
             if dependencies_ok
-            else "remaining dependencies: "
-            + ", ".join(observed.remaining_proprietary_dependencies)
+            else "remaining dependencies: " + ", ".join(observed.remaining_proprietary_dependencies)
         ),
     )
 
@@ -380,9 +370,7 @@ def evaluate_migration(observed: MigrationEvaluationInput) -> MigrationEvaluatio
         and observed.security_policy_status is EvaluationStatus.PASSED
         and dependencies_ok
     )
-    reviewer_agrees = (
-        observed.reviewer_state == "APPROVE" and core_acceptance
-    ) or (
+    reviewer_agrees = (observed.reviewer_state == "APPROVE" and core_acceptance) or (
         observed.reviewer_state in {"REVISE", "BLOCK"}
         and not core_acceptance
         and bool(observed.reviewer_rejection_reason)
@@ -574,8 +562,7 @@ def aggregate_benchmark(
             for value in key(case):
                 groups.setdefault(value, []).append(case)
         return {
-            value: _group_partition(items, partition)
-            for value, items in sorted(groups.items())
+            value: _group_partition(items, partition) for value, items in sorted(groups.items())
         }
 
     return BenchmarkReport(

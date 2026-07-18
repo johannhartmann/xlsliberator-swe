@@ -978,9 +978,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     if is_migration:
         migration_settings = XLSLiberatorSettings.from_env()
         migration_mcp_registry = await load_migration_mcp_registry(migration_settings)
-        migration_evaluation_middleware.append(
-            MigrationEvaluationTraceMiddleware(model_id)
-        )
+        migration_evaluation_middleware.append(MigrationEvaluationTraceMiddleware(model_id))
         migration_skills_middleware.append(
             MigrationSkillsMiddleware(
                 backend=backend_factory,

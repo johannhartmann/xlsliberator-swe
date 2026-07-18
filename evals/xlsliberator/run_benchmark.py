@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+
 import httpx
 
 from agent.xlsliberator.evaluation import (
@@ -45,10 +46,7 @@ def _load_observations(payload: object) -> list[MigrationEvaluationInput]:
     raw_observations = payload.get("observations")
     if not isinstance(raw_observations, list):
         raise ValueError("benchmark response must contain observations")
-    return [
-        MigrationEvaluationInput.model_validate(observation)
-        for observation in raw_observations
-    ]
+    return [MigrationEvaluationInput.model_validate(observation) for observation in raw_observations]
 
 
 def _request_observations(
@@ -92,9 +90,7 @@ def run_benchmark(
         raise ValueError(f"benchmark omitted approved configurations: {sorted(missing)}")
     if any(observation.hidden_definitions_included for observation in observations):
         raise ValueError("benchmark response exposed hidden definitions")
-    return aggregate_benchmark(
-        [evaluate_migration(observation) for observation in observations]
-    )
+    return aggregate_benchmark([evaluate_migration(observation) for observation in observations])
 
 
 def _parse_args() -> argparse.Namespace:
@@ -113,9 +109,7 @@ def main() -> int:
     args = _parse_args()
     approved = _load_approved(args.approved)
     if args.observations is not None:
-        observations = _load_observations(
-            json.loads(args.observations.read_text(encoding="utf-8"))
-        )
+        observations = _load_observations(json.loads(args.observations.read_text(encoding="utf-8")))
     else:
         if not args.endpoint or not args.token:
             raise SystemExit(
