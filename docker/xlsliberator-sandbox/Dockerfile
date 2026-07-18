@@ -191,7 +191,7 @@ RUN chmod 0555 \
       yarn --version; \
       gh --version | head -1; \
       git --version; \
-      go version; \
+      /usr/local/go/bin/go version; \
       cargo --version; \
       java -version 2>&1 | head -1; \
       convert -version | head -1; \
@@ -199,7 +199,7 @@ RUN chmod 0555 \
     } > /etc/xlsliberator-sandbox/versions.txt \
     && test "$(/opt/libreoffice26.2/program/soffice --version | awk '{print $2}')" = "${LIBREOFFICE_BUILD}" \
     && test "$(dpkg-query -W -f='${Version}' libobasis26.2-python-script-provider)" = "${LIBREOFFICE_BUILD}-2" \
-    && PYTHONPATH=/opt/libreoffice26.2/program:/opt/xlsliberator-source/src \
+    && PYTHONPATH=/opt/libreoffice26.2/program \
        /opt/libreoffice26.2/program/python -c 'import pyuno, uno; assert uno.__file__.startswith("/opt/libreoffice26.2/program/"); assert pyuno.__file__.startswith("/opt/libreoffice26.2/program/")' \
     && if ! getent group sandbox >/dev/null; then groupadd --gid 10001 sandbox; fi \
     && if ! getent passwd sandbox >/dev/null; then \
