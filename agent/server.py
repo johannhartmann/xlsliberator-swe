@@ -11,7 +11,7 @@ the agent itself is stateless.
 import logging
 import os
 import warnings
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Literal, cast
 
 from .xlsliberator.sandbox_identity import record_sandbox_identity
@@ -153,6 +153,10 @@ from .utils.sandbox_state import (
     unwrap_sandbox_backend,
 )
 from .utils.tracing import AGENT_TRACING_PROJECT, traced_graph_factory
+from .xlsliberator.integrations.mcp import (
+    MigrationMCPRegistry,
+    load_migration_mcp_registry,
+)
 from .xlsliberator.middleware import WorkbookAttachmentMiddleware
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.settings import XLSLiberatorSettings
@@ -162,6 +166,7 @@ from .xlsliberator.subagents import subagents_for_task_kind
 client = get_client()
 
 DEFAULT_TOOL_LOADER_TIMEOUT_SECONDS = 5.0
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
 def _tool_loader_timeout_seconds() -> float:
@@ -177,6 +182,16 @@ def _tool_loader_timeout_seconds() -> float:
         logger.warning("TOOL_LOADER_TIMEOUT_SECONDS must be positive; using default")
         return DEFAULT_TOOL_LOADER_TIMEOUT_SECONDS
     return timeout
+
+
+def _build_farm_repair_authorized(configurable: Mapping[str, Any]) -> bool:
+    """Require both deployment and per-run authority for build-farm mutation."""
+
+    deployment_enabled = (
+        os.environ.get("XLSLIBERATOR_BUILD_FARM_MUTATION_ENABLED", "").strip().lower()
+        in _TRUE_VALUES
+    )
+    return deployment_enabled and configurable.get("repair_flow_authorized") is True
 
 
 async def _resolve_prompt_default_repo(configurable: dict[str, Any]) -> dict[str, str] | None:
@@ -707,6 +722,7 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         create_prs: bool,
         plan_mode: bool,
         corridor_enabled: bool,
+        migration_mcp_metadata: Mapping[str, Mapping[str, object]] | None,
     ) -> None:
         self._thread_id = thread_id
         self._config = config
@@ -720,6 +736,7 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         self._create_prs = create_prs
         self._plan_mode = plan_mode
         self._corridor_enabled = corridor_enabled
+        self._migration_mcp_metadata = migration_mcp_metadata
 
     def _prepare_config_fingerprint(self) -> Any:
         configurable = (self._config or {}).get("configurable") or {}
@@ -731,6 +748,7 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
             "plan_mode": self._plan_mode,
             "model": self._model_id,
             "effort": self._effort,
+            "migration_mcp": self._migration_mcp_metadata,
         }
 
     async def _prepare(self, state: PrepareRunState, runtime: Runtime) -> dict[str, Any]:  # noqa: ARG002
@@ -754,15 +772,18 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         repo_custom_instructions = await _resolve_repo_custom_instructions(prompt_default_repo)
 
         try:
+            thread_metadata: dict[str, object] = {
+                "agent_kind": "agent",
+                "model": self._model_id,
+                "effort": self._effort,
+                "source": self._source,
+                "plan_mode": self._plan_mode,
+            }
+            if self._migration_mcp_metadata is not None:
+                thread_metadata["xlsliberator_mcp"] = dict(self._migration_mcp_metadata)
             await client.threads.update(
                 thread_id=self._thread_id,
-                metadata={
-                    "agent_kind": "agent",
-                    "model": self._model_id,
-                    "effort": self._effort,
-                    "source": self._source,
-                    "plan_mode": self._plan_mode,
-                },
+                metadata=thread_metadata,
             )
             await record_agent_thread_usage(
                 thread_id=self._thread_id,
@@ -939,11 +960,16 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     corridor_tools = await _load_corridor_mcp_tools()
     browser_tools = load_browser_tools()
     migration_skills_middleware: list[Any] = []
-    if configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND:
+    migration_mcp_registry: MigrationMCPRegistry | None = None
+    migration_settings: XLSLiberatorSettings | None = None
+    is_migration = configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND
+    if is_migration:
+        migration_settings = XLSLiberatorSettings.from_env()
+        migration_mcp_registry = await load_migration_mcp_registry(migration_settings)
         migration_skills_middleware.append(
             MigrationSkillsMiddleware(
                 backend=backend_factory,
-                settings=XLSLiberatorSettings.from_env(),
+                settings=migration_settings,
             )
         )
 
@@ -970,10 +996,26 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         use_gateway=use_gateway,
         **subagent_model_kwargs,
     )
+    build_farm_authorized = _build_farm_repair_authorized(configurable)
+    migration_implementation_tools = (
+        migration_mcp_registry.implementation_tools(
+            build_farm_authorized=build_farm_authorized,
+        )
+        if migration_mcp_registry is not None
+        else []
+    )
+    migration_lead_tools = (
+        migration_mcp_registry.tools_for_role(
+            "lead",
+            build_farm_authorized=build_farm_authorized,
+        )
+        if migration_mcp_registry is not None
+        else []
+    )
     migration_subagents = subagents_for_task_kind(
         configurable.get("task_kind"),
         model=subagent_model,
-        tools=[],
+        tools=migration_implementation_tools,
         migration_task_kind=WORKBOOK_MIGRATION_TASK_KIND,
     )
     return create_deep_agent(
@@ -1005,6 +1047,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
             *observability_tools,
             *currents_tools,
             *notion_tools,
+            *migration_lead_tools,
         ],
         subagents=[
             _general_purpose_subagent(subagent_model),
@@ -1028,6 +1071,11 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                     create_prs=always_create_prs,
                     plan_mode=plan_mode,
                     corridor_enabled=bool(corridor_tools),
+                    migration_mcp_metadata=(
+                        migration_mcp_registry.metadata()
+                        if migration_mcp_registry is not None
+                        else None
+                    ),
                 ),
                 WorkbookAttachmentMiddleware(configurable),
                 *migration_skills_middleware,

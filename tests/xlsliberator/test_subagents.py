@@ -50,49 +50,49 @@ def test_specialist_catalog_has_required_roles_and_isolated_skill_views() -> Non
     specs = build_migration_subagents(_model(), [])
 
     for spec in specs:
-        assert spec["skills"] == [f"{SPECIALIST_SKILLS_ROOT}/{spec['name']}/"]
+        assert spec.get("skills") == [f"{SPECIALIST_SKILLS_ROOT}/{spec['name']}/"]
         assert "must not certify or approve" in spec["system_prompt"]
         assert "self_certified=false" in spec["system_prompt"]
-        assert spec["response_format"] is SpecialistResult
-        assert isinstance(spec["middleware"][0], SpecialistTraceMiddleware)
+        assert spec.get("response_format") is SpecialistResult
+        middleware = spec.get("middleware")
+        assert middleware is not None
+        assert isinstance(middleware[0], SpecialistTraceMiddleware)
 
 
 def test_tool_allowlists_drop_unrelated_and_hidden_tools() -> None:
     specs = build_migration_subagents(
         _model(),
         _tools(
-            "xlsliberator_runtime_inspect",
-            "xlsliberator_migration_check",
-            "xlsliberator_corpus_run_public",
-            "xlsliberator_corpus_run_hidden",
+            "xlsliberator_runtime_inspect_document",
+            "xlsliberator_corpus_run_public_suite",
+            "xlsliberator_corpus_run_hidden_acceptance",
             "xlsliberator_buildfarm_apply_patch",
         ),
     )
     by_name = {spec["name"]: spec for spec in specs}
 
     assert _tool_names(cast(dict[str, Any], by_name["workbook-forensics"])) == [
-        "xlsliberator_runtime_inspect"
+        "xlsliberator_runtime_inspect_document"
     ]
     assert _tool_names(cast(dict[str, Any], by_name["test-adversary"])) == [
-        "xlsliberator_migration_check",
-        "xlsliberator_corpus_run_public",
+        "xlsliberator_corpus_run_public_suite",
     ]
-    assert "xlsliberator_corpus_run_hidden" not in {
+    assert "xlsliberator_corpus_run_hidden_acceptance" not in {
         name for spec in specs for name in _tool_names(cast(dict[str, Any], spec))
     }
     assert _tool_names(cast(dict[str, Any], by_name["libreoffice-engineer"])) == [
-        "xlsliberator_runtime_inspect",
+        "xlsliberator_runtime_inspect_document",
         "xlsliberator_buildfarm_apply_patch",
     ]
 
 
 def test_filesystem_policy_prevents_test_adversary_from_writing_candidates() -> None:
     test_adversary = next(
-        spec
-        for spec in build_migration_subagents(_model(), [])
-        if spec["name"] == "test-adversary"
+        spec for spec in build_migration_subagents(_model(), []) if spec["name"] == "test-adversary"
     )
-    permissions = cast(list[FilesystemPermission], test_adversary["permissions"])
+    permissions_value = test_adversary.get("permissions")
+    assert permissions_value is not None
+    permissions = cast(list[FilesystemPermission], permissions_value)
 
     assert permissions[0].operations == ["read"]
     assert permissions[0].paths == ["/**"]
@@ -126,7 +126,7 @@ def test_specialist_model_and_effort_routing_are_explicit() -> None:
 
     specs = build_migration_subagents(model, [])
 
-    assert all(spec["model"] is model for spec in specs)
+    assert all(spec.get("model") is model for spec in specs)
     assert all(SPECIALIST_BY_NAME[spec["name"]].effort == "high" for spec in specs)
     metadata = specialist_trace_metadata("formula-engineer")
     assert metadata["agent_role"] == "formula-engineer"

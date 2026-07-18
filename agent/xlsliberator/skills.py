@@ -330,7 +330,7 @@ async def _materialize_specialist_skills(backend: SandboxBackendProtocol) -> Non
                 f"test -f {shlex.quote(f'{source}/SKILL.md')} && "
                 f"cp -R {shlex.quote(source)} {shlex.quote(destination)}/"
             )
-    commands.append(f'if find {quoted_root} -type l -print -quit | grep -q .; then exit 45; fi')
+    commands.append(f"if find {quoted_root} -type l -print -quit | grep -q .; then exit 45; fi")
     result = await backend.aexecute(
         "\n".join(commands),
         timeout=MATERIALIZATION_TIMEOUT_SECONDS,

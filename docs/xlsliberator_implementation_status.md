@@ -57,9 +57,9 @@ also passed.
 | 07 — thin Open-SWE fork | COMPLETE; REMOTE CI GREEN AT `27d2aa19` | retained history, typed settings, namespace, full preserved CI, upstream drift and sync procedure |
 | 08 — sandbox snapshot | COMPLETE; REMOTE CI GREEN AT `84d22454` | Docker-only image build, immutable dependency locks, exact LibreOffice `26.2.4.2`, PyUNO/runtime tool smoke, MCP connectivity, identity, secret scan and SPDX SBOM in [run 29651333157](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651333157) |
 | 09 — triggers and hydration | COMPLETE; REMOTE CI GREEN AT `f513e485` | deterministic threads, fail-closed attachment safety, durable sandbox hydration, bounded dossier context, resume/cancel/cleanup, full Agent CI in [run 29651655678](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651655678) and Docker-only sandbox evidence in [run 29651655701](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29651655701) |
-| 10 — Deep Agents skills | PENDING | progressive disclosure, precedence, skill lint |
-| 11 — core migration skills | PENDING IN `xlsliberator` | forensics, planning, testing, and package skill evidence |
-| 12 — specialist skills | PENDING IN `xlsliberator` | formula, VBA, UI, dependency, and LibreOffice skill evidence |
+| 10 — Deep Agents skills | IMPLEMENTED; CI EVIDENCE PENDING | progressive disclosure, precedence, skill lint |
+| 11 — core migration skills | COMPLETE IN `xlsliberator` | production forensics, planning, testing, package and security skills; full CI in [run 29652794341](https://github.com/johannhartmann/xlsliberator/actions/runs/29652794341) |
+| 12 — specialist skills | COMPLETE IN `xlsliberator` | formula, VBA, UI, dependency, adapter, debugging and core-patching skills; full CI in [run 29652794341](https://github.com/johannhartmann/xlsliberator/actions/runs/29652794341) |
 | 13 — specialist routing | PENDING | isolated specialist scopes and model routing |
 | 14 — curated MCP tools | PENDING | allowlists, typed unavailable states, integration traces |
 | 15 — deterministic middleware | PENDING | checkpoints and anti-fake-success gates |
