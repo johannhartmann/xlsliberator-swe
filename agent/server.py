@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Literal, cast
 
 from .xlsliberator.settings import apply_environment_defaults
+from .xlsliberator.sandbox_identity import record_sandbox_identity
 
 apply_environment_defaults()
 
@@ -486,6 +487,7 @@ async def ensure_sandbox_for_thread(
         )
 
     await _configure_git_identity(sandbox_backend)
+    await record_sandbox_identity(thread_id, sandbox_backend, thread_client=client)
 
     return sandbox_backend
 

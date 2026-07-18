@@ -1,0 +1,42 @@
+name: xlsliberator-open-swe
+
+services:
+  sandbox:
+    image: ${XLSLIBERATOR_SANDBOX_IMAGE:-ghcr.io/johannhartmann/xlsliberator-swe-sandbox:2026.07.0}
+    build:
+      context: .
+      dockerfile: docker/xlsliberator-sandbox/Dockerfile
+      additional_contexts:
+        xlsliberator: ${XLSLIBERATOR_BUILD_CONTEXT:-../xlsliberator}
+      args:
+        XLSLIBERATOR_OFFICE_IMAGE: ${XLSLIBERATOR_OFFICE_IMAGE:-xlsliberator-libreoffice:26.2.4.2}
+        OPEN_SWE_SOURCE_COMMIT: ${OPEN_SWE_SOURCE_COMMIT:?set OPEN_SWE_SOURCE_COMMIT}
+        XLSLIBERATOR_SOURCE_COMMIT: ${XLSLIBERATOR_SOURCE_COMMIT:-e9e096cbde1cc64dbb2f2c5117ce58a00199c1ff}
+        XLSLIBERATOR_SANDBOX_VERSION: ${XLSLIBERATOR_SANDBOX_VERSION:-2026.07.0}
+        XLSLIBERATOR_SANDBOX_IMAGE: ${XLSLIBERATOR_SANDBOX_IMAGE:-ghcr.io/johannhartmann/xlsliberator-swe-sandbox:2026.07.0}
+        LIBREOFFICE_BUILD: ${XLSLIBERATOR_LIBREOFFICE_VERSION:-26.2.4.2}
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2
+    mem_limit: 7936m
+    pids_limit: 1024
+    storage_opt:
+      size: 32G
+    stop_grace_period: 30s
+    environment:
+      XLSLIBERATOR_JOB_WORKSPACE: /workspace
+      XLSLIBERATOR_SANDBOX_COMMAND_TIMEOUT_SECONDS: "1800"
+    volumes:
+      - sandbox-job:/workspace
+      - .:/source/xlsliberator-swe:ro
+      - ../xlsliberator:/source/xlsliberator:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=2g,uid=10001,gid=10001,mode=1777
+      - /home/sandbox:rw,nosuid,nodev,size=512m,uid=10001,gid=10001,mode=0700
+
+volumes:
+  sandbox-job:
