@@ -31,14 +31,12 @@ if [ -d "${xlsliberator_context}/.git" ]; then
   fi
 fi
 
-docker buildx build \
-  --load \
+docker build \
   --tag "${office_image}" \
   --file docker/office/libreoffice/Dockerfile \
   "${xlsliberator_context}"
 
-docker buildx build \
-  --load \
+docker build \
   --tag "${image}" \
   --build-context "xlsliberator=${xlsliberator_context}" \
   --build-arg "XLSLIBERATOR_OFFICE_IMAGE=${office_image}" \
