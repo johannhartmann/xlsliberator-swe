@@ -237,7 +237,10 @@ async def test_trigger_hydrates_and_persists_sandbox_relative_locations(
     assert result.run_id == "run-2"
     assert result.artifact_locations == {}
     assert fake.threads.metadata["artifact_locations"]["source"] == "source/book.xlsx"
-    assert all(not path.startswith("/") for path in fake.threads.metadata["artifact_locations"].values())
+    assert all(
+        not path.startswith("/")
+        for path in fake.threads.metadata["artifact_locations"].values()
+    )
     assert "artifact_base64" not in json.dumps(fake.threads.metadata)
 
 
