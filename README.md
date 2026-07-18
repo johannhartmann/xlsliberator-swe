@@ -43,6 +43,8 @@ Deployment settings are listed in `config/xlsliberator.env.example`. An empty
 MCP endpoint means the service is unavailable; it is never treated as success.
 See [XLSLiberator MCP configuration](docs/XLSLIBERATOR_MCP.md) for the local
 Docker, production TLS, role allowlist, hidden-test, and build-farm boundaries.
+See [XLSLiberator migration middleware](docs/XLSLIBERATOR_MIDDLEWARE.md) for
+checkpoint, evidence, anti-fake-success, policy, and budget gates.
 
 ---
 

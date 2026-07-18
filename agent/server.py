@@ -157,7 +157,10 @@ from .xlsliberator.integrations.mcp import (
     MigrationMCPRegistry,
     load_migration_mcp_registry,
 )
-from .xlsliberator.middleware import WorkbookAttachmentMiddleware
+from .xlsliberator.middleware import (
+    WorkbookAttachmentMiddleware,
+    migration_middleware_stack,
+)
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.settings import XLSLiberatorSettings
 from .xlsliberator.skills import MigrationSkillsMiddleware
@@ -960,6 +963,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     corridor_tools = await _load_corridor_mcp_tools()
     browser_tools = load_browser_tools()
     migration_skills_middleware: list[Any] = []
+    migration_guard_middleware: list[AgentMiddleware[Any, Any, Any]] = []
     migration_mcp_registry: MigrationMCPRegistry | None = None
     migration_settings: XLSLiberatorSettings | None = None
     is_migration = configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND
@@ -971,6 +975,11 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                 backend=backend_factory,
                 settings=migration_settings,
             )
+        )
+        migration_guard_middleware = migration_middleware_stack(
+            configurable,
+            backend=backend_factory,
+            service_health=migration_mcp_registry.metadata(),
         )
 
     currents_tools: list[Any] = []
@@ -1079,6 +1088,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                 ),
                 WorkbookAttachmentMiddleware(configurable),
                 *migration_skills_middleware,
+                *migration_guard_middleware,
                 SanitizeToolInputsMiddleware(),
                 ModelCallLimitMiddleware(run_limit=MODEL_CALL_RECURSION_LIMIT, exit_behavior="end"),
                 ToolErrorMiddleware(),
