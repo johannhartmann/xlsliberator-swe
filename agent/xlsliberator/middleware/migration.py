@@ -347,7 +347,7 @@ def _artifact_check_command(required: Mapping[str, str]) -> str:
                 "fi",
             ]
         )
-    checks.extend(["test \"$missing\" -eq 0", "printf 'evidence=complete\\n'"])
+    checks.extend(['test "$missing" -eq 0', "printf 'evidence=complete\\n'"])
     return "\n".join(checks)
 
 
@@ -813,7 +813,7 @@ class RegressionPromotionMiddleware(AgentMiddleware):
             [
                 "set -eu",
                 f"marker={f'{MIGRATION_ROOT}/regression/promotion-required'!r}",
-                "test -s \"$marker\" || exit 0",
+                'test -s "$marker" || exit 0',
                 _artifact_check_command(REQUIRED_REGRESSION_ARTIFACTS),
             ]
         )
@@ -861,11 +861,11 @@ class NoFakeSuccessMiddleware(AgentMiddleware):
             [
                 "set -eu",
                 f"evidence={f'{MIGRATION_ROOT}/evidence'!r}",
-                "test -d \"$evidence\"",
+                'test -d "$evidence"',
                 (
-                    "if grep -RniE '\"status\"[[:space:]]*:[[:space:]]*"
-                    "\"(skipped|unavailable|unimplemented|timed[_ -]?out|"
-                    "transport[_ -]?only|missing)\"' \"$evidence\"; then"
+                    'if grep -RniE \'"status"[[:space:]]*:[[:space:]]*'
+                    '"(skipped|unavailable|unimplemented|timed[_ -]?out|'
+                    'transport[_ -]?only|missing)"\' "$evidence"; then'
                 ),
                 "  exit 76",
                 "fi",

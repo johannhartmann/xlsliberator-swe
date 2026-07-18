@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from deepagents.backends.protocol import ExecuteResponse, SandboxBackendProtocol
-from langchain.agents.middleware.types import ModelRequest, ModelResponse
+from langchain.agents.middleware.types import AgentState, ModelRequest, ModelResponse
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
@@ -80,8 +80,11 @@ def _model_request() -> ModelRequest:
     )
 
 
-def _terminal_state(status: str) -> dict[str, Any]:
-    return {"messages": [AIMessage(content=f"XLSLIBERATOR_STATUS: {status}")]}
+def _terminal_state(status: str) -> AgentState:
+    return cast(
+        AgentState,
+        {"messages": [AIMessage(content=f"XLSLIBERATOR_STATUS: {status}")]},
+    )
 
 
 async def _ok_tool(_request: ToolCallRequest) -> ToolMessage:
@@ -202,7 +205,7 @@ async def test_checkpoint_resumes_latest_and_snapshots_meaningful_success() -> N
 
     assert resumed == {"migration_checkpoint_path": "migration/checkpoints/00000007"}
     assert isinstance(result, ToolMessage)
-    assert any("stage=\"$checkpoints/.stage-$name\"" in command for command in backend.commands)
+    assert any('stage="$checkpoints/.stage-$name"' in command for command in backend.commands)
 
 
 @pytest.mark.asyncio
@@ -373,6 +376,6 @@ async def test_missing_terminal_status_is_never_silently_promoted() -> None:
 
     with pytest.raises(MigrationMiddlewareError, match="explicit terminal marker"):
         await middleware.aafter_agent(
-            {"messages": [AIMessage(content="looks good")]},
+            cast(AgentState, {"messages": [AIMessage(content="looks good")]}),
             cast(Any, MagicMock()),
         )
