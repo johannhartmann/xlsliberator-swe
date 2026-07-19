@@ -51,9 +51,9 @@ jobs:
           printf '%s\n' \
             '{"status":"passed","sanitized_findings":[]}' \
             > "$hidden/interactive-game.json"
-          sudo chown -R 10001:10001 "$bridge" "$runtime" "$hidden"
           chmod 0700 "$bridge" "$runtime" "$hidden"
           chmod 0600 "$hidden/interactive-game.json"
+          sudo chown -R 10001:10001 "$bridge" "$runtime" "$hidden"
           {
             echo "SHOWCASE_BRIDGE=$bridge"
             echo "SHOWCASE_RUNTIME=$runtime"
