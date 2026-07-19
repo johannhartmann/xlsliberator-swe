@@ -4,7 +4,7 @@ The `XLSLiberator autonomous showcase` workflow is the reproducible public
 entrypoint for the first complete workbook-migration episode. It accepts the
 immutable public `TetrisGameDemo.xlsb` through
 `POST /api/xlsliberator/migrations`, runs Open SWE with GitHub Models
-`openai/gpt-4.1`, and targets only LibreOffice full build `26.2.4.2`.
+`openai/gpt-4.1-mini`, and targets only LibreOffice full build `26.2.4.2`.
 
 The trusted server container receives the workflow-scoped GitHub token for
 model inference and the Docker socket for sandbox orchestration. Per-thread

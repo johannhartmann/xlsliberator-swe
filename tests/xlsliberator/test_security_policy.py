@@ -219,6 +219,7 @@ def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() ->
     assert workflow.count("--env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1") == 2
     assert workflow.count('--group-add "$(stat -c %g /var/run/docker.sock)"') == 2
     assert '("libreoffice-mcp", 8000), ("corpus-mcp", 8010)' in workflow
+    assert "SHOWCASE_MODEL: openai:openai/gpt-4.1-mini" in workflow
     assert "docker logs xlsliberator-showcase-runtime" in workflow
     assert "docker logs xlsliberator-showcase-corpus" in workflow
 
