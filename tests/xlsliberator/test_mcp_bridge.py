@@ -299,7 +299,9 @@ async def test_scenario_bridge_binds_target_candidate_and_evidence(tmp_path: Pat
         "/workspace/migration/generated/candidate.zip",
     ]
     assert backend.uploads == ["/workspace/migration/evidence/keyboard-control.zip"]
-    assert backend.files["/workspace/migration/evidence/keyboard-control.zip"] == b"real-gui-evidence"
+    assert (
+        backend.files["/workspace/migration/evidence/keyboard-control.zip"] == b"real-gui-evidence"
+    )
     assert list(tmp_path.iterdir()) == []
 
 
@@ -312,9 +314,7 @@ async def test_replay_bridge_forwards_declared_replay_id(tmp_path: Path) -> None
     ) -> dict[str, Any]:
         assert replay_id == "interactive-game"
         assert set(evidence_paths) == {"keyboard-control", "timer-tick"}
-        assert {
-            scenario: Path(path).read_bytes() for scenario, path in evidence_paths.items()
-        } == {
+        assert {scenario: Path(path).read_bytes() for scenario, path in evidence_paths.items()} == {
             "keyboard-control": b"keyboard-evidence",
             "timer-tick": b"timer-evidence",
         }
