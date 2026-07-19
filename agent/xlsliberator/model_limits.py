@@ -14,7 +14,7 @@ from deepagents import (
 )
 from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.language_models import ModelProfile
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
@@ -106,8 +106,8 @@ def _tool_content_text(content: str | list[str | dict[str, Any]]) -> str:
     return "\n".join(text)
 
 
-def _message_groups(messages: Sequence[BaseMessage]) -> list[list[BaseMessage]]:
-    groups: list[list[BaseMessage]] = []
+def _message_groups(messages: Sequence[AnyMessage]) -> list[list[AnyMessage]]:
+    groups: list[list[AnyMessage]] = []
     index = 0
     while index < len(messages):
         message = messages[index]
@@ -119,18 +119,20 @@ def _message_groups(messages: Sequence[BaseMessage]) -> list[list[BaseMessage]]:
                 for tool_call in message.tool_calls
                 if isinstance(tool_call.get("id"), str)
             }
-            while (
-                index < len(messages)
-                and isinstance(messages[index], ToolMessage)
-                and messages[index].tool_call_id in tool_call_ids
-            ):
-                group.append(messages[index])
+            while index < len(messages):
+                next_message = messages[index]
+                if not (
+                    isinstance(next_message, ToolMessage)
+                    and next_message.tool_call_id in tool_call_ids
+                ):
+                    break
+                group.append(next_message)
                 index += 1
         groups.append(group)
     return groups
 
 
-def compact_showcase_messages(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+def compact_showcase_messages(messages: Sequence[AnyMessage]) -> list[AnyMessage]:
     """Bound provider input without separating assistant tool calls from their results."""
 
     groups = _message_groups(messages)
@@ -143,7 +145,7 @@ def compact_showcase_messages(messages: Sequence[BaseMessage]) -> list[BaseMessa
     ]
     recent_positions = set(tool_positions[-SHOWCASE_RECENT_TOOL_RESULTS:])
 
-    compacted: list[BaseMessage] = []
+    compacted: list[AnyMessage] = []
     for index, message in enumerate(bounded):
         if isinstance(message, ToolMessage):
             limit = (

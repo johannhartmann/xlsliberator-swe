@@ -2,11 +2,11 @@
 
 from unittest.mock import patch
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 
 from agent.xlsliberator.model_limits import (
-    SHOWCASE_HISTORY_GROUPS,
     SHOWCASE_CONTEXT_WINDOW_TOKENS,
+    SHOWCASE_HISTORY_GROUPS,
     SHOWCASE_MAX_INPUT_TOKENS,
     SHOWCASE_MAX_OUTPUT_TOKENS,
     SHOWCASE_OLD_TOOL_RESULT_CHARS,
@@ -52,7 +52,7 @@ def test_showcase_harness_removes_general_agent_and_large_tool_surface() -> None
 
 
 def test_showcase_context_keeps_tool_call_pairs_and_bounds_old_results() -> None:
-    messages = [HumanMessage(content="migrate workbook")]
+    messages: list[AnyMessage] = [HumanMessage(content="migrate workbook")]
     for index in range(SHOWCASE_HISTORY_GROUPS + 2):
         tool_call_id = f"call-{index}"
         messages.extend(
@@ -82,9 +82,7 @@ def test_showcase_context_keeps_tool_call_pairs_and_bounds_old_results() -> None
         if isinstance(message, AIMessage)
         for tool_call in message.tool_calls
     }
-    results = {
-        message.tool_call_id for message in compacted if isinstance(message, ToolMessage)
-    }
+    results = {message.tool_call_id for message in compacted if isinstance(message, ToolMessage)}
     assert calls == results
     old_result = next(message for message in compacted if isinstance(message, ToolMessage))
     assert len(str(old_result.content)) <= SHOWCASE_OLD_TOOL_RESULT_CHARS + 30
