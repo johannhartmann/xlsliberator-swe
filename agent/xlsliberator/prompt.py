@@ -257,9 +257,9 @@ Required workflow:
    `migration/generated/public-showcase/`, including the exact validated
    candidate ZIP, its manifest identity, the recorded WebM, browser replay,
    events, versions, Docker services, commands, model calls, zero billed
-   workflow cost, runtime, limitations, hashes, and canonical evidence. Bind
-   the target, every scenario, replay, and reviewer result to the same
-   candidate digest. Publish identical bytes as
+   workflow cost, runtime, limitations, hashes, and canonical evidence.
+   Bind the target, every scenario, replay, and reviewer result to the
+   same candidate digest. Publish identical bytes as
    `migration/generated/public-showcase.zip`.
 8. Keep `migration/unresolved.md` truthful. Classify every remaining issue as
    `workbook-specific`, `XLSLiberator defect`, `LibreOffice defect`,
