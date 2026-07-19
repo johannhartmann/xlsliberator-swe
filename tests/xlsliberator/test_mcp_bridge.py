@@ -288,8 +288,8 @@ async def test_scenario_bridge_binds_target_candidate_and_evidence(tmp_path: Pat
             "candidate_path": "/workspace/migration/generated/candidate.zip",
             "evidence_path": "/workspace/migration/evidence/keyboard-control.zip",
             "scenario_id": "keyboard-control",
-            "actions": [{"kind": "key", "value": "LEFT"}],
-            "adapter_config": {"sheet": "Game"},
+            "actions_json": '[{"kind":"key","value":"LEFT"}]',
+            "adapter_config_json": '{"sheet":"Game"}',
         }
     )
 
@@ -302,6 +302,94 @@ async def test_scenario_bridge_binds_target_candidate_and_evidence(tmp_path: Pat
     assert (
         backend.files["/workspace/migration/evidence/keyboard-control.zip"] == b"real-gui-evidence"
     )
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_showcase_bridge_schemas_are_strict_and_keep_generic_values_as_json(
+    tmp_path: Path,
+) -> None:
+    async def unused(**_arguments: Any) -> dict[str, Any]:
+        return _success()
+
+    scenario = StructuredTool.from_function(
+        coroutine=unused,
+        name="run_application_scenario",
+        description="Run application scenario.",
+    )
+    replay = StructuredTool.from_function(
+        coroutine=unused,
+        name="bundle_application_replays",
+        description="Bundle replay.",
+    )
+
+    for name, tool, expected in (
+        (
+            "run_application_scenario",
+            scenario,
+            {
+                "target_path",
+                "candidate_path",
+                "evidence_path",
+                "scenario_id",
+                "actions_json",
+                "adapter_config_json",
+            },
+        ),
+        (
+            "bundle_application_replays",
+            replay,
+            {"evidence_paths_json", "output_path", "replay_id"},
+        ),
+    ):
+        registry = bridge_migration_mcp_registry(
+            _registry(name, tool),
+            backend=lambda: cast(SandboxBackendProtocol, _Backend({})),
+            thread_id="private-thread",
+            bridge_root=str(tmp_path),
+        )
+        schema = registry.curated[0].tool.tool_call_schema
+
+        assert isinstance(schema, dict)
+        assert schema["additionalProperties"] is False
+        assert set(schema["properties"]) == expected
+        assert set(schema["required"]) == expected
+
+
+@pytest.mark.asyncio
+async def test_scenario_bridge_rejects_malformed_generic_json_before_download(
+    tmp_path: Path,
+) -> None:
+    async def unused(**_arguments: Any) -> dict[str, Any]:
+        raise AssertionError("trusted runtime must not be called")
+
+    backend = _Backend({})
+    registry = bridge_migration_mcp_registry(
+        _registry(
+            "run_application_scenario",
+            StructuredTool.from_function(
+                coroutine=unused,
+                name="run_application_scenario",
+                description="Run application scenario.",
+            ),
+        ),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    with pytest.raises(MCPBridgeError, match="actions_json must contain valid JSON"):
+        await registry.curated[0].tool.ainvoke(
+            {
+                "target_path": "/workspace/migration/output/target.ods",
+                "candidate_path": "/workspace/migration/generated/candidate.zip",
+                "evidence_path": "/workspace/migration/evidence/scenario.zip",
+                "scenario_id": "source-derived-scenario",
+                "actions_json": "[",
+                "adapter_config_json": "{}",
+            }
+        )
+
+    assert backend.downloads == []
     assert list(tmp_path.iterdir()) == []
 
 
@@ -341,10 +429,12 @@ async def test_replay_bridge_forwards_declared_replay_id(tmp_path: Path) -> None
 
     result = await registry.curated[0].tool.ainvoke(
         {
-            "evidence_paths": {
-                "keyboard-control": "/workspace/migration/evidence/keyboard-control.zip",
-                "timer-tick": "/workspace/migration/evidence/timer-tick.zip",
-            },
+            "evidence_paths_json": (
+                '{'
+                '"keyboard-control":"/workspace/migration/evidence/keyboard-control.zip",'
+                '"timer-tick":"/workspace/migration/evidence/timer-tick.zip"'
+                "}"
+            ),
             "output_path": "/workspace/migration/public/replay.zip",
             "replay_id": "interactive-game",
         }

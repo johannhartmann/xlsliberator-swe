@@ -84,6 +84,7 @@ async def _capture_create_deep_agent_kwargs(
         return MagicMock(name=f"model-{len(calls)}")
 
     registry = MigrationMCPRegistry((), {})
+    register_showcase_profile = MagicMock()
     with (
         patch(
             "agent.server.resolve_github_token",
@@ -114,11 +115,16 @@ async def _capture_create_deep_agent_kwargs(
             new_callable=AsyncMock,
             return_value=registry,
         ),
+        patch(
+            "agent.server.register_showcase_harness_profile",
+            register_showcase_profile,
+        ),
         patch("agent.server.construct_system_prompt", return_value="prompt"),
         patch("agent.server.create_deep_agent", side_effect=fake_create_deep_agent),
     ):
         await get_agent(config or _base_config())
 
+    captured["register_showcase_profile_calls"] = register_showcase_profile.call_count
     return captured
 
 
@@ -228,8 +234,8 @@ async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("XLSLIBERATOR_SHOWCASE_MODE", "true")
-    monkeypatch.setenv("XLSLIBERATOR_PRIMARY_MODEL", "openai:openai/gpt-4.1")
-    monkeypatch.setenv("XLSLIBERATOR_SPECIALIST_MODEL", "openai:openai/gpt-4.1")
+    monkeypatch.setenv("XLSLIBERATOR_PRIMARY_MODEL", "openai:openai/gpt-4.1-mini")
+    monkeypatch.setenv("XLSLIBERATOR_SPECIALIST_MODEL", "openai:openai/gpt-4.1-mini")
     config = _base_config()
     configurable = config.setdefault("configurable", {})
     assert isinstance(configurable, dict)
@@ -249,6 +255,9 @@ async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
         "ui-migration-engineer",
         "test-adversary",
     ]
+    assert all("runnable" in subagent for subagent in subagents)
+    assert all("skills" not in subagent for subagent in subagents)
+    assert all("middleware" not in subagent for subagent in subagents)
     assert {getattr(tool, "name", getattr(tool, "__name__", "")) for tool in tools} == {
         "request_independent_migration_review"
     }
@@ -256,6 +265,7 @@ async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
     assert calls[1][1]["max_tokens"] == 768
     assert calls[0][1]["profile"]["max_input_tokens"] == 7_232
     assert calls[1][1]["profile"]["max_input_tokens"] == 7_232
+    assert captured["register_showcase_profile_calls"] == 1
     assert captured["system_prompt"] == {"base": None}
     middleware = captured["middleware"]
     assert isinstance(middleware, list)

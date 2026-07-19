@@ -85,6 +85,8 @@ def test_showcase_prompt_is_bounded_and_preserves_every_acceptance_gate() -> Non
         "LibreOffice full build `26.2.4.2`",
         "source-derived mutations",
         "migration/generated/candidate.zip",
+        "xlsliberator candidate-package",
+        "does not open a workbook or execute candidate code",
         "at least two isolated",
         "does not know this workbook",
         "Do not copy a repository demo candidate",

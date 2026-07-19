@@ -202,6 +202,11 @@ Docker is the only platform. LibreOffice full build `26.2.4.2`, its bundled
 Python, UNO, and PyUNO may run only behind the authorized XLSLiberator runtime
 MCP. Never launch Python, `uv`, PyUNO, UNO, LibreOffice, or `soffice` in the
 sandbox or on a host, including as a diagnostic or fallback.
+The sandbox `execute` tool is limited to inert file inspection, hashing, and
+packaging. It may invoke the installed `xlsliberator candidate-package` command
+to validate and deterministically package generated source files; that command
+does not open a workbook or execute candidate code. Never use `execute` to run
+candidate modules or any Office process.
 
 Read the complete hydrated dossier and source bundle for source SHA-256
 `da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1`.

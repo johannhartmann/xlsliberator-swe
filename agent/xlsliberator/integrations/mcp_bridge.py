@@ -8,6 +8,7 @@ the sandbox backend and one per-call bridge directory.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import tempfile
@@ -17,6 +18,7 @@ from typing import Any
 
 from deepagents.backends.protocol import SandboxBackendProtocol
 from langchain_core.tools import BaseTool, StructuredTool
+from pydantic import BaseModel, ConfigDict, Field
 
 from .mcp import CuratedTool, MCPServiceHealth, MigrationMCPRegistry
 
@@ -36,7 +38,37 @@ _BRIDGED_SESSION_TOOLS = frozenset(
     }
 )
 _MAX_BRIDGE_FILE_BYTES = 64 * 1024 * 1024
+_MAX_JSON_TEXT_CHARS = 131_072
 _MCP_SUCCESS = frozenset({"PASSED", "passed"})
+
+
+class _ScenarioBridgeInput(BaseModel):
+    """Strict provider-facing schema with generic JSON carried as text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_path: str
+    candidate_path: str
+    evidence_path: str
+    scenario_id: str
+    actions_json: str = Field(
+        description="JSON array of source-derived generic application actions.",
+    )
+    adapter_config_json: str = Field(
+        description="JSON object containing the candidate-declared adapter configuration.",
+    )
+
+
+class _ReplayBridgeInput(BaseModel):
+    """Strict provider-facing schema for an arbitrary declared replay set."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_paths_json: str = Field(
+        description="JSON object mapping arbitrary scenario IDs to sandbox evidence ZIP paths.",
+    )
+    output_path: str
+    replay_id: str
 
 
 class MCPBridgeError(RuntimeError):
@@ -133,10 +165,16 @@ def _bridged_tool(
     # dict. Calling ``get_input_schema()`` on that dict asks LangChain to model
     # the tool's entire Runnable input union and creates an unrelated
     # ``root.anyOf`` schema. Strict OpenAI-compatible providers reject that
-    # wrapper before any tool can run, so preserve the MCP schema verbatim.
-    input_schema = item.tool.args_schema
-    if input_schema is None:
-        input_schema = item.tool.get_input_schema()
+    # wrapper before any tool can run. Preserve safe MCP schemas; encode the two
+    # open-ended nested payloads as validated JSON text at the provider boundary.
+    if item.original_name == "run_application_scenario":
+        input_schema = _ScenarioBridgeInput
+    elif item.original_name == "bundle_application_replays":
+        input_schema = _ReplayBridgeInput
+    else:
+        input_schema = item.tool.args_schema
+        if input_schema is None:
+            input_schema = item.tool.get_input_schema()
     return StructuredTool.from_function(
         coroutine=handler,
         name=item.tool.name,
@@ -222,6 +260,8 @@ async def _bridge_scenario(
     target_path = _sandbox_file(arguments, "target_path")
     candidate_path = _sandbox_file(arguments, "candidate_path")
     evidence_path = _sandbox_file(arguments, "evidence_path")
+    actions = _required_json_array(arguments, "actions_json")
+    adapter_config = _required_json_object(arguments, "adapter_config_json")
     directory = _call_directory(root, thread_id, "scenario")
     try:
         local_target = directory / "target.ods"
@@ -229,7 +269,13 @@ async def _bridge_scenario(
         local_evidence = directory / "evidence.zip"
         _write_private(local_target, await _download(backend, target_path))
         _write_private(local_candidate, await _download(backend, candidate_path))
-        forwarded = dict(arguments)
+        forwarded = {
+            key: value
+            for key, value in arguments.items()
+            if key not in {"actions_json", "adapter_config_json"}
+        }
+        forwarded["actions"] = actions
+        forwarded["adapter_config"] = adapter_config
         forwarded["target_path"] = str(local_target)
         forwarded["candidate_path"] = str(local_candidate)
         forwarded["evidence_path"] = str(local_evidence)
@@ -248,8 +294,8 @@ async def _bridge_bundle(
     root: Path,
     arguments: Mapping[str, Any],
 ) -> dict[str, Any]:
-    raw_paths = arguments.get("evidence_paths")
-    if not isinstance(raw_paths, Mapping) or not raw_paths:
+    raw_paths = _required_json_object(arguments, "evidence_paths_json")
+    if not raw_paths:
         raise MCPBridgeError("evidence_paths must be a non-empty object")
     output_path = _sandbox_file(arguments, "output_path")
     directory = _call_directory(root, thread_id, "bundle")
@@ -478,6 +524,30 @@ def _required_string(arguments: Mapping[str, Any], name: str) -> str:
     if not isinstance(value, str) or not value or "\x00" in value:
         raise MCPBridgeError(f"{name} must be a non-empty NUL-free string")
     return value
+
+
+def _required_json_array(arguments: Mapping[str, Any], name: str) -> list[Any]:
+    value = _required_json(arguments, name)
+    if not isinstance(value, list):
+        raise MCPBridgeError(f"{name} must encode a JSON array")
+    return value
+
+
+def _required_json_object(arguments: Mapping[str, Any], name: str) -> dict[str, Any]:
+    value = _required_json(arguments, name)
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        raise MCPBridgeError(f"{name} must encode a JSON object with string keys")
+    return value
+
+
+def _required_json(arguments: Mapping[str, Any], name: str) -> Any:
+    raw = _required_string(arguments, name)
+    if len(raw) > _MAX_JSON_TEXT_CHARS:
+        raise MCPBridgeError(f"{name} exceeds the JSON text limit")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise MCPBridgeError(f"{name} must contain valid JSON") from exc
 
 
 def _workbook_suffix(path: str) -> str:

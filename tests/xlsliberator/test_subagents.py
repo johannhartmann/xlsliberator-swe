@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from unittest.mock import MagicMock, patch
 
 import pytest
 from deepagents.backends import CompositeBackend
@@ -181,6 +182,42 @@ def test_specialist_model_and_effort_routing_are_explicit() -> None:
     assert "/workspace/migration/candidates/formula-engineer/**" in cast(
         tuple[str, ...], metadata["artifact_paths"]
     )
+
+
+def test_compact_specialists_use_precompiled_minimal_agents() -> None:
+    created: list[dict[str, Any]] = []
+
+    def fake_create_agent(*args: object, **kwargs: Any) -> MagicMock:
+        created.append({"args": args, **kwargs})
+        return MagicMock()
+
+    with patch("agent.xlsliberator.subagents.create_agent", side_effect=fake_create_agent):
+        specs = build_migration_subagents(
+            _model(),
+            _tools(
+                "xlsliberator_runtime_build_application_candidate",
+                "xlsliberator_runtime_run_application_scenario",
+                "xlsliberator_runtime_bundle_application_replays",
+            ),
+            compact=True,
+        )
+
+    assert len(created) == len(SPECIALIST_PROFILES)
+    assert all("runnable" in spec for spec in specs)
+    assert all("model" not in spec and "skills" not in spec for spec in specs)
+    for call in created:
+        assert call["response_format"] is SpecialistResult
+        assert "Do not copy a demo or special-case a fixture." in call["system_prompt"]
+        middleware = call["middleware"]
+        filesystem = next(item for item in middleware if isinstance(item, FilesystemMiddleware))
+        assert set(filesystem._enabled_tools or ()) == {
+            "ls",
+            "read_file",
+            "write_file",
+            "edit_file",
+        }
+        assert filesystem._custom_system_prompt == ""
+        assert "execute" not in filesystem._enabled_tools
 
 
 def test_candidate_tournament_isolates_two_candidates_and_evaluator() -> None:

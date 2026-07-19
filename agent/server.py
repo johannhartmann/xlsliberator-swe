@@ -169,6 +169,7 @@ from .xlsliberator.middleware import (
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.model_limits import (
     bound_showcase_model_kwargs,
+    register_showcase_harness_profile,
     showcase_system_prompt,
 )
 from .xlsliberator.prompt import (
@@ -895,6 +896,8 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     is_migration = configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND
     migration_settings = XLSLiberatorSettings.from_env() if is_migration else None
     compact_showcase = bool(migration_settings and migration_settings.showcase_mode)
+    if compact_showcase:
+        register_showcase_harness_profile()
     profile_login = resolve_github_login(as_json_object(config))
     # Team/profile settings are accepted stale for a short TTL so graph factories
     # stay off the critical path during worker load and retry storms.
@@ -1149,6 +1152,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         tools=migration_implementation_tools,
         migration_task_kind=WORKBOOK_MIGRATION_TASK_KIND,
         filesystem_backend=FilesystemOnlyBackend(lambda: backend_factory(None)),
+        compact=compact_showcase,
     )
     if compact_showcase:
         migration_subagents = [

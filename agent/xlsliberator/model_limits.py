@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import Final
 
-from deepagents import SystemPromptConfig
+from deepagents import (
+    GeneralPurposeSubagentProfile,
+    HarnessProfile,
+    SystemPromptConfig,
+    register_harness_profile,
+)
 from langchain_core.language_models import ModelProfile
 
 from ..utils.model import ModelKwargs
@@ -12,6 +17,10 @@ from ..utils.model import ModelKwargs
 SHOWCASE_CONTEXT_WINDOW_TOKENS: Final[int] = 8_000
 SHOWCASE_MAX_OUTPUT_TOKENS: Final[int] = 768
 SHOWCASE_MAX_INPUT_TOKENS: Final[int] = SHOWCASE_CONTEXT_WINDOW_TOKENS - SHOWCASE_MAX_OUTPUT_TOKENS
+SHOWCASE_TASK_DESCRIPTION: Final[str] = (
+    "Delegate one independent workbook-migration task. Available specialists:\n"
+    "{available_agents}"
+)
 
 
 def showcase_model_profile() -> ModelProfile:
@@ -43,3 +52,16 @@ def showcase_system_prompt(prefix: str | None = None) -> SystemPromptConfig:
     if prefix:
         prompt["prefix"] = prefix
     return prompt
+
+
+def register_showcase_harness_profile() -> None:
+    """Remove unused general-agent context in the dedicated showcase process."""
+
+    register_harness_profile(
+        "openai",
+        HarnessProfile(
+            tool_description_overrides={"task": SHOWCASE_TASK_DESCRIPTION},
+            excluded_tools=frozenset({"delete", "glob", "grep"}),
+            general_purpose_subagent=GeneralPurposeSubagentProfile(enabled=False),
+        ),
+    )
