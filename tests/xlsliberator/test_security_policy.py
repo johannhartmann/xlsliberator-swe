@@ -196,6 +196,9 @@ def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() ->
     assert "Preflight public workbook hydration in hostile sandbox" in workflow
     assert "--network none" in workflow
     assert "xlsprobe dossier /input/TetrisGameDemo.xlsb" in workflow
+    assert 'http_status="$(' in workflow
+    assert "hydration-diagnostic.json" in workflow
+    assert "hydration-files.txt" in workflow
     assert 'sudo chown -R 10001:10001 "$bridge" "$runtime" "$hidden"' in workflow
     assert 'chmod 0700 "$bridge" "$runtime" "$hidden"' in workflow
     assert workflow.count("--env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1") == 2

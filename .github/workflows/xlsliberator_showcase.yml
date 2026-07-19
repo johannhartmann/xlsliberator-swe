@@ -266,14 +266,58 @@ jobs:
                 delete_source_after_completion: true
               }
             }' > "${SHOWCASE_OUTPUT}/request.json"
-          curl --fail-with-body --silent \
-            --request POST \
-            --header "Authorization: Bearer ${SHOWCASE_TRIGGER_TOKEN}" \
-            --header "X-XLSLiberator-Owner: ${SHOWCASE_OWNER}" \
-            --header "Content-Type: application/json" \
-            --data-binary "@${SHOWCASE_OUTPUT}/request.json" \
-            http://127.0.0.1:2024/api/xlsliberator/migrations \
-            > "${SHOWCASE_OUTPUT}/invocation.json"
+          http_status="$(
+            curl --silent --show-error \
+              --write-out '%{http_code}' \
+              --output "${SHOWCASE_OUTPUT}/invocation.json" \
+              --request POST \
+              --header "Authorization: Bearer ${SHOWCASE_TRIGGER_TOKEN}" \
+              --header "X-XLSLiberator-Owner: ${SHOWCASE_OWNER}" \
+              --header "Content-Type: application/json" \
+              --data-binary "@${SHOWCASE_OUTPUT}/request.json" \
+              http://127.0.0.1:2024/api/xlsliberator/migrations
+          )"
+          if [[ "$http_status" != 202 ]]; then
+            thread_id="$(
+              docker exec xlsliberator-showcase-server \
+                /opt/open-swe-venv/bin/python -c \
+                'import sys
+          import uuid
+          print(uuid.uuid5(
+              uuid.NAMESPACE_URL,
+              f"xlsliberator:{sys.argv[1]}:{sys.argv[2]}",
+          ))' \
+                "${SHOWCASE_OWNER}" \
+                "$source_sha"
+            )"
+            curl --fail-with-body --silent \
+              "http://127.0.0.1:2024/threads/${thread_id}" |
+              jq '{
+                thread_id,
+                metadata: (
+                  .metadata |
+                  {
+                    migration_status,
+                    migration_error
+                  }
+                )
+              }' > "${SHOWCASE_OUTPUT}/hydration-diagnostic.json"
+            sandbox_name="$(
+              docker ps \
+                --filter 'name=^/xlsliberator-swe-' \
+                --format '{{.Names}}' |
+              head -n 1
+            )"
+            if [[ -n "$sandbox_name" ]]; then
+              docker exec --user 10001:10001 "$sandbox_name" \
+                find /workspace/source /workspace/migration \
+                  -maxdepth 3 -type f -printf '%P\t%s bytes\n' \
+                > "${SHOWCASE_OUTPUT}/hydration-files.txt" 2>&1 || true
+            fi
+            jq . "${SHOWCASE_OUTPUT}/invocation.json"
+            jq . "${SHOWCASE_OUTPUT}/hydration-diagnostic.json"
+            exit 1
+          fi
           jq -e '.thread_id and .run_id and (.duplicate == false)' \
             "${SHOWCASE_OUTPUT}/invocation.json"
           echo "SHOWCASE_THREAD_ID=$(jq -r .thread_id "${SHOWCASE_OUTPUT}/invocation.json")" \
