@@ -74,6 +74,7 @@ from .integrations.notion_mcp import load_notion_tools
 from .integrations.stagehand_browser import load_browser_tools
 from .middleware import (
     BasePrepareRunMiddleware,
+    ExcludeToolsMiddleware,
     ModelFallbackMiddleware,
     PlanModeMiddleware,
     PullRequestCreationGuardMiddleware,
@@ -179,6 +180,7 @@ from .xlsliberator.subagents import subagents_for_task_kind
 client = get_client()
 
 DEFAULT_TOOL_LOADER_TIMEOUT_SECONDS = 5.0
+SHOWCASE_MAX_OUTPUT_TOKENS = 1_500
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
@@ -992,7 +994,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         subagent_model_id, subagent_effort, fable_enabled=fable_enabled
     )
 
-    max_tokens = 4000 if compact_showcase else DEFAULT_LLM_MAX_TOKENS
+    max_tokens = SHOWCASE_MAX_OUTPUT_TOKENS if compact_showcase else DEFAULT_LLM_MAX_TOKENS
     model_kwargs = provider_model_kwargs(
         model_id,
         profile_effort,
@@ -1116,9 +1118,10 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         migration_implementation_tools = [
             tool for tool in migration_implementation_tools if tool.name in SHOWCASE_MCP_TOOL_NAMES
         ]
-        migration_lead_tools = [
-            tool for tool in migration_lead_tools if tool.name in SHOWCASE_MCP_TOOL_NAMES
-        ]
+        # Curated specialists own the deterministic runtime calls. Keeping the
+        # same large MCP schemas on the lead duplicates context without adding
+        # authority or behavioral coverage.
+        migration_lead_tools = []
     migration_review_tools = [request_independent_migration_review] if is_migration else []
     migration_subagents = subagents_for_task_kind(
         configurable.get("task_kind"),
@@ -1207,7 +1210,10 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                     ),
                     compact_showcase=compact_showcase,
                 ),
-                WorkbookAttachmentMiddleware(configurable),
+                WorkbookAttachmentMiddleware(
+                    configurable,
+                    include_requirements=not compact_showcase,
+                ),
                 *migration_evaluation_middleware,
                 *migration_skills_middleware,
                 *migration_guard_middleware,
@@ -1232,6 +1238,15 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                 notify_step_limit_reached,
                 *fallback_middleware,
                 *plan_mode_middleware,
+                *(
+                    [
+                        ExcludeToolsMiddleware(
+                            excluded=frozenset({"write_todos", "ls", "glob", "grep"})
+                        )
+                    ]
+                    if compact_showcase
+                    else []
+                ),
                 SanitizeFireworksMessagesMiddleware(),
                 SanitizeThinkingBlocksMiddleware(),
             ],

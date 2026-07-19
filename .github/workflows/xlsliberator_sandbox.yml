@@ -27,7 +27,7 @@ jobs:
     env:
       SANDBOX_IMAGE: xlsliberator-open-swe-sandbox:${{ github.sha }}
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
-      XLSLIBERATOR_SOURCE_COMMIT: 74efefd1e0e2412513786985a9a78a4e0fa55009
+      XLSLIBERATOR_SOURCE_COMMIT: 17c8e4e715ef30569cf81830229d4c9ba8ac9903
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: johannhartmann/xlsliberator
-          ref: 74efefd1e0e2412513786985a9a78a4e0fa55009
+          ref: 17c8e4e715ef30569cf81830229d4c9ba8ac9903
           path: xlsliberator
       - name: Build pinned office image
         working-directory: xlsliberator

@@ -223,5 +223,13 @@ async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
     assert {getattr(tool, "name", getattr(tool, "__name__", "")) for tool in tools} == {
         "request_independent_migration_review"
     }
-    assert calls[0][1]["max_tokens"] == 4000
-    assert calls[1][1]["max_tokens"] == 4000
+    assert calls[0][1]["max_tokens"] == 1_500
+    assert calls[1][1]["max_tokens"] == 1_500
+    middleware = captured["middleware"]
+    assert isinstance(middleware, list)
+    workbook_context = next(
+        item for item in middleware if type(item).__name__ == "WorkbookAttachmentMiddleware"
+    )
+    assert workbook_context._include_requirements is False
+    exclusions = [item for item in middleware if type(item).__name__ == "ExcludeToolsMiddleware"]
+    assert len(exclusions) == 1

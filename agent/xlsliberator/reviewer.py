@@ -52,6 +52,7 @@ from .settings import XLSLiberatorSettings
 logger = logging.getLogger(__name__)
 
 MIGRATION_REVIEW_TRACING_PROJECT = "xlsliberator-migration-review"
+SHOWCASE_REVIEW_MAX_OUTPUT_TOKENS = 1_500
 REVIEW_RESULT_PATH = "migration/reviewer/result.json"
 TARGET_PATH = "migration/output/target.ods"
 _REPAIR_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,99}$")
@@ -404,7 +405,11 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
     model_kwargs = provider_model_kwargs(
         settings.reviewer_model,
         reviewer_effort,
-        max_tokens=4000 if settings.showcase_mode else DEFAULT_LLM_MAX_TOKENS,
+        max_tokens=(
+            SHOWCASE_REVIEW_MAX_OUTPUT_TOKENS
+            if settings.showcase_mode
+            else DEFAULT_LLM_MAX_TOKENS
+        ),
         openai_reasoning_default=DEFAULT_LLM_REASONING,
     )
     model = make_model(
