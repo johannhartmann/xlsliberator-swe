@@ -74,8 +74,8 @@ also passed.
 
 ## Next action
 
-Rerun Prompt 23 after the public GitHub Models daily quota resets, or configure
-an authorized provider credential for the same generic workflow. Completion
+Manually dispatch Prompt 23 after the public GitHub Models daily quota resets,
+or configure an authorized provider credential for the same generic workflow. Completion
 requires the real candidate, target evidence, independent `APPROVE`, and
 human-use replay. Never replace that proof with a copied demo, fixture-specific
 converter, workbook/hash/sheet/control dispatch, weakened oracle, or fabricated

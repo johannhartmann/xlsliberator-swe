@@ -206,6 +206,8 @@ def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() ->
     workflow = (root / ".github/workflows/xlsliberator_showcase.yml").read_text(encoding="utf-8")
     server_image = (root / "docker/xlsliberator-server/Dockerfile").read_text(encoding="utf-8")
 
+    assert "workflow_dispatch:" in workflow
+    assert "pull_request:" not in workflow
     assert "COPY --chown=10001:10001" in server_image
     assert "USER 10001:10001" in server_image
     assert "Preflight public workbook hydration in hostile sandbox" in workflow

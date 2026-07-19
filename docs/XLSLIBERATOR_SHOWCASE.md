@@ -1,10 +1,10 @@
 # Autonomous migration showcase
 
-The `XLSLiberator autonomous showcase` workflow is the reproducible public
-entrypoint for the first complete workbook-migration episode. It accepts the
-immutable public `TetrisGameDemo.xlsb` through
-`POST /api/xlsliberator/migrations`, runs Open SWE with GitHub Models
-`openai/gpt-4.1-mini`, and targets only LibreOffice full build `26.2.4.2`.
+The manually dispatched `XLSLiberator autonomous showcase` workflow is the
+reproducible public entrypoint for the first complete workbook-migration
+episode. It accepts the immutable public `TetrisGameDemo.xlsb` through
+`POST /api/xlsliberator/migrations`, runs Open SWE with the declared GitHub
+Models role models, and targets only LibreOffice full build `26.2.4.2`.
 
 The trusted server container receives the workflow-scoped GitHub token for
 model inference and the Docker socket for sandbox orchestration. Per-thread
@@ -28,4 +28,5 @@ status, and the validator result.
 GitHub Models access is granted only through the workflow's `models: read`
 permission. No long-lived provider key is required, and the workflow records
 the billed model cost as zero while disclosing that GitHub may apply account
-rate limits.
+rate limits. Manual dispatch prevents ordinary pull-request updates from
+consuming the public model quota.
