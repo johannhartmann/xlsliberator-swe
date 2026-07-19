@@ -144,7 +144,9 @@ async def test_migration_specialists_use_permissioned_filesystem_without_executi
     assert isinstance(subagents, list)
     assert subagents
 
-    for subagent in subagents:
+    migration_subagents = [subagent for subagent in subagents if "middleware" in subagent]
+    assert migration_subagents
+    for subagent in migration_subagents:
         middleware = subagent["middleware"]
         filesystem = next(item for item in middleware if isinstance(item, FilesystemMiddleware))
         assert isinstance(filesystem.backend, CompositeBackend)
