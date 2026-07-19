@@ -68,11 +68,16 @@ also passed.
 | 18 — web threads | COMPLETE; REMOTE CI GREEN AT `6a7f22bc` | authenticated owner-scoped status/events/messages/artifacts/final API, deterministic thread mapping, retention, safe publication and fake-service integration |
 | 19 — demos and corpus | COMPLETE IN `xlsliberator`; REMOTE CI GREEN AT `28a80f5` | eight licensed serious episodes, behavioral scenarios, searchable public subsets, evidence-derived reporting |
 | 20 — repair promotion | COMPLETE; REMOTE MAIN CI GREEN AT `28a80f5`; OPEN-SWE FORMAT REPAIR INCLUDED IN `e2430a23` | exact eight-stage state machine, immutable layer classification, pinned LO identities, corpus/build-farm boundaries, validator and independent-review gates |
-| 21 — execution hardening | IMPLEMENTED AT `d0481087`; CI REPAIR PUSHED AS `e2430a23` | networkless read-only sandbox, server-owned typed grants, role-authorized MCP, twelve-probe security adversary, escape smoke, Docker Bandit and dependency audit; main repository fully green in run `29658220586` |
-| 22 — LangSmith evaluations | IMPLEMENTED; CI EVIDENCE PENDING | migration-only trace metadata, exactly fourteen deterministic evaluators, five-state public/hidden reports, format/feature/configuration grouping, fail-closed release decision, nightly approved-configuration benchmark |
-| 23 — autonomous showcase | PENDING | reproducible migration and independent verdict |
+| 21 — execution hardening | COMPLETE; CURRENT CI GREEN AT `4b8dfbda` | networkless read-only sandbox, server-owned typed grants, role-authorized MCP, twelve-probe security adversary, escape smoke, Docker Bandit and dependency audit; Agent CI [29684882696](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882696) and Docker sandbox [29684882689](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882689) |
+| 22 — LangSmith evaluations | COMPLETE IMPLEMENTATION; CURRENT CI GREEN | migration-only trace metadata, exactly fourteen deterministic evaluators, five-state public/hidden reports, format/feature/configuration grouping, fail-closed release decision, and nightly approved-configuration benchmark workflow; live nightly execution still requires repository benchmark endpoint/token secrets |
+| 23 — autonomous showcase | BLOCKED BY EXTERNAL PUBLIC-MODEL QUOTA | [run 29684882715](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882715) passed exact image builds, hostile-sandbox hydration, trusted-service startup, and API trigger, then the first GitHub Models call and every bounded retry returned HTTP 429; no candidate, independent `APPROVE`, or human-use proof exists |
 
 ## Next action
 
-Obtain blocking CI evidence for Prompts 21 and 22, then execute the first full
-autonomous migration showcase in Prompt 23.
+Rerun Prompt 23 after the public GitHub Models daily quota resets, or configure
+an authorized provider credential for the same generic workflow. Completion
+requires the real candidate, target evidence, independent `APPROVE`, and
+human-use replay. Never replace that proof with a copied demo, fixture-specific
+converter, workbook/hash/sheet/control dispatch, weakened oracle, or fabricated
+artifact. Concrete episode identity is confined to the separate showcase
+prompt/schema/reviewer; the reusable migration runtime remains source-agnostic.
