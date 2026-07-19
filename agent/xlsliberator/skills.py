@@ -291,11 +291,10 @@ async def _materialize_project_skills(
             f"test -d {quoted_source}",
             f"test -r {quoted_identity}",
             "identity=$(jq -er '.image.xlsliberator_commit | "
-            "select(type == \"string\" and test(\"^[0-9a-f]{40,64}$\"))' "
+            'select(type == "string" and test("^[0-9a-f]{40,64}$"))\' '
             f"{quoted_identity})",
             f"expected_ref={quoted_ref}",
-            'if printf "%s\\n" "$expected_ref" '
-            "| grep -Eq '^[0-9a-f]{40,64}$'; then",
+            'if printf "%s\\n" "$expected_ref" | grep -Eq \'^[0-9a-f]{40,64}$\'; then',
             '  test "$identity" = "$expected_ref"',
             "fi",
             f"rm -rf {quoted_destination}",
