@@ -50,10 +50,10 @@ class SpecialistResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    summary: str = Field(max_length=200)
-    findings: tuple[Annotated[str, Field(max_length=140)], ...] = Field(max_length=2)
-    artifact_paths: tuple[Annotated[str, Field(max_length=160)], ...] = Field(max_length=4)
-    escalation: str = Field(max_length=120)
+    summary: str = Field(max_length=1000)
+    findings: tuple[Annotated[str, Field(max_length=1000)], ...] = Field(max_length=12)
+    artifact_paths: tuple[Annotated[str, Field(max_length=320)], ...] = Field(max_length=16)
+    escalation: str = Field(max_length=1000)
     confidence: Literal["HIGH", "MEDIUM", "LOW"]
     self_certified: Literal[False]
 
@@ -481,9 +481,11 @@ Allowed write paths:
 
 {profile.output_contract}
 {profile.escalation}
-Write the required trajectory JSON before returning. Return summary, findings,
-artifact_paths, escalation, confidence, and self_certified=false. You may
-assess your work but cannot certify or approve it."""
+Write the required trajectory JSON before returning. Keep the structured result
+bounded: summary and escalation at most 1000 characters each, at most 12 findings,
+and at most 16 artifact paths; leave details in the declared files. Return summary,
+findings, artifact_paths, escalation, confidence, and self_certified=false. You
+may assess your work but cannot certify or approve it."""
 
 
 def build_migration_subagents(

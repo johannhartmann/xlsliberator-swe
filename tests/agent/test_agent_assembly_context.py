@@ -261,10 +261,10 @@ async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
     assert {getattr(tool, "name", getattr(tool, "__name__", "")) for tool in tools} == {
         "request_independent_migration_review"
     }
-    assert calls[0][1]["max_tokens"] == 768
-    assert calls[1][1]["max_tokens"] == 768
-    assert calls[0][1]["profile"]["max_input_tokens"] == 7_232
-    assert calls[1][1]["profile"]["max_input_tokens"] == 7_232
+    assert calls[0][1]["max_tokens"] == 1_536
+    assert calls[1][1]["max_tokens"] == 1_536
+    assert calls[0][1]["profile"]["max_input_tokens"] == 6_464
+    assert calls[1][1]["profile"]["max_input_tokens"] == 6_464
     assert captured["register_showcase_profile_calls"] == 1
     assert captured["system_prompt"] == {"base": None}
     middleware = captured["middleware"]

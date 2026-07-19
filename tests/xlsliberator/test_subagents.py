@@ -229,6 +229,35 @@ def test_compact_specialists_use_precompiled_minimal_agents() -> None:
         assert "execute" not in enabled_tools
 
 
+def test_specialist_result_accepts_bounded_evidence_inventory() -> None:
+    result = SpecialistResult(
+        summary="S" * 1000,
+        findings=tuple(f"finding-{index}: " + ("F" * 200) for index in range(12)),
+        artifact_paths=tuple(
+            f"/workspace/migration/evidence/forensics/artifact-{index}.json"
+            for index in range(16)
+        ),
+        escalation="E" * 1000,
+        confidence="MEDIUM",
+        self_certified=False,
+    )
+
+    assert len(result.findings) == 12
+    assert len(result.artifact_paths) == 16
+
+
+def test_specialist_result_remains_bounded() -> None:
+    with pytest.raises(ValueError):
+        SpecialistResult(
+            summary="S" * 1001,
+            findings=(),
+            artifact_paths=(),
+            escalation="",
+            confidence="LOW",
+            self_certified=False,
+        )
+
+
 def test_candidate_tournament_isolates_two_candidates_and_evaluator() -> None:
     tournament = candidate_tournament(
         "pricing/MonthEnd",
