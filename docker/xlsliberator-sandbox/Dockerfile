@@ -12,7 +12,7 @@ ARG UV_VERSION=0.9.26
 ARG NODE_VERSION=22.22.0
 ARG YARN_VERSION=4.12.0
 ARG GH_VERSION=2.83.1
-ARG SFW_VERSION=2.0.6
+ARG SFW_BINARY_VERSION=1.13.1
 ARG GO_VERSION=1.23.5
 
 LABEL org.opencontainers.image.title="XLSLiberator Open SWE sandbox" \
@@ -42,8 +42,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     XLSLIBERATOR_SANDBOX_PIDS_LIMIT=1024 \
     XLSLIBERATOR_SANDBOX_COMMAND_TIMEOUT_SECONDS=1800 \
     XLSLIBERATOR_SANDBOX_IDLE_TTL_SECONDS=7200 \
-    XLSLIBERATOR_SANDBOX_DELETE_AFTER_STOP_SECONDS=86400 \
-    SFW_SKIP_UPDATE_CHECK=1
+    XLSLIBERATOR_SANDBOX_DELETE_AFTER_STOP_SECONDS=86400
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -76,10 +75,23 @@ RUN set -eux; \
     tar -xJf "/tmp/${archive}" -C /usr/local --strip-components=1; \
     rm "/tmp/${archive}"; \
     corepack enable; \
-    corepack prepare "yarn@${YARN_VERSION}" --activate; \
-    npm install --global "sfw@${SFW_VERSION}"; \
-    sfw --version; \
-    test -e "$(npm root --global)/sfw/.sfw-cache/latest"
+    corepack prepare "yarn@${YARN_VERSION}" --activate
+
+RUN set -eux; \
+    arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
+    case "${arch}" in \
+      amd64) sfw_arch="x86_64"; sfw_sha256="4dc46b626a7c5b81c0b54e1984ee53be5a628dbfb2f55ab14e9b04c8a134db6a" ;; \
+      arm64) sfw_arch="arm64"; sfw_sha256="f87bbbca2192fca9740f9bdb115e7cfaa22e957a8f5234d5f97fce1383aa1d66" ;; \
+      *) echo "unsupported architecture: ${arch}" >&2; exit 1 ;; \
+    esac; \
+    binary="sfw-free-linux-${sfw_arch}"; \
+    curl -fsSL \
+      "https://github.com/SocketDev/sfw-free/releases/download/v${SFW_BINARY_VERSION}/${binary}" \
+      -o "/tmp/${binary}"; \
+    echo "${sfw_sha256}  /tmp/${binary}" | sha256sum -c -; \
+    install -m 0755 "/tmp/${binary}" /usr/local/bin/sfw; \
+    rm "/tmp/${binary}"; \
+    sfw --version
 
 RUN set -eux; \
     arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \

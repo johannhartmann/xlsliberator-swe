@@ -186,6 +186,21 @@ def test_sandbox_image_reuses_preexisting_numeric_uid_and_gid() -> None:
     assert "getent passwd sandbox" not in dockerfile
 
 
+def test_sandbox_image_pins_firewall_binary_without_runtime_bootstrap() -> None:
+    dockerfile = (Path(__file__).parents[2] / "docker/xlsliberator-sandbox/Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ARG SFW_BINARY_VERSION=1.13.1" in dockerfile
+    assert "sfw-free/releases/download/v${SFW_BINARY_VERSION}" in dockerfile
+    assert "4dc46b626a7c5b81c0b54e1984ee53be5a628dbfb2f55ab14e9b04c8a134db6a" in dockerfile
+    assert "f87bbbca2192fca9740f9bdb115e7cfaa22e957a8f5234d5f97fce1383aa1d66" in dockerfile
+    assert "install -m 0755" in dockerfile
+    assert "/usr/local/bin/sfw" in dockerfile
+    assert 'npm install --global "sfw@' not in dockerfile
+    assert ".sfw-cache/latest" not in dockerfile
+
+
 def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() -> None:
     root = Path(__file__).parents[2]
     workflow = (root / ".github/workflows/xlsliberator_showcase.yml").read_text(encoding="utf-8")
