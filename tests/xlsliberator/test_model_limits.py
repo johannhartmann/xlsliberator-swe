@@ -134,7 +134,7 @@ def test_binary_artifact_paths_require_runtime_inspection() -> None:
 
 
 def test_showcase_provider_interval_stays_below_public_request_rate() -> None:
-    assert SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS >= 60 / 15
+    assert SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS >= 60 / 10
 
 
 @pytest.mark.asyncio
@@ -175,3 +175,29 @@ async def test_showcase_provider_lane_is_shared_and_serial() -> None:
     assert first_result is first_response
     assert second_result is second_response
     assert second_entered.is_set()
+
+
+@pytest.mark.asyncio
+async def test_showcase_provider_retries_429_after_outer_backoff() -> None:
+    class _RateLimitError(Exception):
+        status_code = 429
+
+    middleware = ShowcaseProviderRateLimitMiddleware(
+        coordinator_key=f"test-{uuid.uuid4()}",
+        min_interval_seconds=0,
+        rate_limit_retries=1,
+        rate_limit_base_delay_seconds=0,
+    )
+    request = cast(ModelRequest, object())
+    response = cast(ModelResponse, object())
+    calls = 0
+
+    async def handler(_request: ModelRequest) -> ModelResponse:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise _RateLimitError
+        return response
+
+    assert await middleware.awrap_model_call(request, handler) is response
+    assert calls == 2

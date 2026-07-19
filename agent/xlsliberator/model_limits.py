@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import weakref
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Final
@@ -31,7 +32,9 @@ SHOWCASE_RECENT_TOOL_RESULT_CHARS: Final[int] = 1_800
 SHOWCASE_OLD_TOOL_RESULT_CHARS: Final[int] = 240
 SHOWCASE_MESSAGE_CHARS: Final[int] = 1_200
 SHOWCASE_TOOL_ARGUMENT_CHARS: Final[int] = 240
-SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS: Final[float] = 4.25
+SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS: Final[float] = 6.25
+SHOWCASE_PROVIDER_RATE_LIMIT_RETRIES: Final[int] = 3
+SHOWCASE_PROVIDER_RATE_LIMIT_BASE_DELAY_SECONDS: Final[float] = 60.0
 SHOWCASE_TASK_DESCRIPTION: Final[str] = (
     "Delegate one independent workbook-migration task. Available specialists:\n{available_agents}"
 )
@@ -57,6 +60,7 @@ _BINARY_ARTIFACT_SUFFIXES: Final[frozenset[str]] = frozenset(
 _BINARY_OMISSION = (
     "[binary artifact omitted: inspect it through bounded XLSLiberator runtime metadata]"
 )
+logger = logging.getLogger(__name__)
 
 
 def _truncate_text(value: str, limit: int) -> str:
@@ -216,8 +220,15 @@ class ShowcaseContextBudgetMiddleware(AgentMiddleware[Any, Any, Any]):
 class _ShowcaseProviderCoordinator:
     """Serialize calls and space their start times for a constrained endpoint."""
 
-    def __init__(self, min_interval_seconds: float) -> None:
+    def __init__(
+        self,
+        min_interval_seconds: float,
+        rate_limit_retries: int,
+        rate_limit_base_delay_seconds: float,
+    ) -> None:
         self._min_interval_seconds = min_interval_seconds
+        self._rate_limit_retries = rate_limit_retries
+        self._rate_limit_base_delay_seconds = rate_limit_base_delay_seconds
         self._lock = asyncio.Lock()
         self._next_start = 0.0
 
@@ -226,17 +237,39 @@ class _ShowcaseProviderCoordinator:
         handler: Callable[[], Awaitable[ModelResponse]],
     ) -> ModelResponse:
         async with self._lock:
-            loop = asyncio.get_running_loop()
-            delay = self._next_start - loop.time()
-            if delay > 0:
-                await asyncio.sleep(delay)
-            self._next_start = loop.time() + self._min_interval_seconds
-            return await handler()
+            for attempt in range(self._rate_limit_retries + 1):
+                loop = asyncio.get_running_loop()
+                delay = self._next_start - loop.time()
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                self._next_start = loop.time() + self._min_interval_seconds
+                try:
+                    return await handler()
+                except Exception as exc:
+                    if not _is_rate_limit_error(exc) or attempt >= self._rate_limit_retries:
+                        raise
+                    retry_delay = self._rate_limit_base_delay_seconds * (2**attempt)
+                    logger.warning(
+                        "Constrained provider returned 429; retrying in %.1fs (%d/%d)",
+                        retry_delay,
+                        attempt + 1,
+                        self._rate_limit_retries,
+                    )
+                    await asyncio.sleep(retry_delay)
+            raise AssertionError("provider retry loop exhausted without a result")
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    status_code = getattr(exc, "status_code", None)
+    if status_code == 429:
+        return True
+    response = getattr(exc, "response", None)
+    return getattr(response, "status_code", None) == 429
 
 
 _SHOWCASE_PROVIDER_COORDINATORS: weakref.WeakKeyDictionary[
     asyncio.AbstractEventLoop,
-    dict[tuple[str, float], _ShowcaseProviderCoordinator],
+    dict[tuple[str, float, int, float], _ShowcaseProviderCoordinator],
 ] = weakref.WeakKeyDictionary()
 
 
@@ -248,19 +281,36 @@ class ShowcaseProviderRateLimitMiddleware(AgentMiddleware[Any, Any, Any]):
         *,
         coordinator_key: str = "public-showcase",
         min_interval_seconds: float = SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS,
+        rate_limit_retries: int = SHOWCASE_PROVIDER_RATE_LIMIT_RETRIES,
+        rate_limit_base_delay_seconds: float = SHOWCASE_PROVIDER_RATE_LIMIT_BASE_DELAY_SECONDS,
     ) -> None:
         if min_interval_seconds < 0:
             raise ValueError("min_interval_seconds must be non-negative")
+        if rate_limit_retries < 0:
+            raise ValueError("rate_limit_retries must be non-negative")
+        if rate_limit_base_delay_seconds < 0:
+            raise ValueError("rate_limit_base_delay_seconds must be non-negative")
         self._coordinator_key = coordinator_key
         self._min_interval_seconds = min_interval_seconds
+        self._rate_limit_retries = rate_limit_retries
+        self._rate_limit_base_delay_seconds = rate_limit_base_delay_seconds
 
     def _coordinator(self) -> _ShowcaseProviderCoordinator:
         loop = asyncio.get_running_loop()
         coordinators = _SHOWCASE_PROVIDER_COORDINATORS.setdefault(loop, {})
-        key = (self._coordinator_key, self._min_interval_seconds)
+        key = (
+            self._coordinator_key,
+            self._min_interval_seconds,
+            self._rate_limit_retries,
+            self._rate_limit_base_delay_seconds,
+        )
         coordinator = coordinators.get(key)
         if coordinator is None:
-            coordinator = _ShowcaseProviderCoordinator(self._min_interval_seconds)
+            coordinator = _ShowcaseProviderCoordinator(
+                self._min_interval_seconds,
+                self._rate_limit_retries,
+                self._rate_limit_base_delay_seconds,
+            )
             coordinators[key] = coordinator
         return coordinator
 
