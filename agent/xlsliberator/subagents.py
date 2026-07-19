@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict, cast
+from typing import Annotated, Any, Literal, cast
 
 from deepagents.backends import CompositeBackend
 from deepagents.backends.protocol import BackendProtocol
@@ -20,7 +20,9 @@ from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, Mod
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langsmith.run_helpers import get_tracing_context, tracing_context
+from pydantic import BaseModel, ConfigDict, Field
 
+from .model_limits import BinaryArtifactReadGuardMiddleware, ShowcaseContextBudgetMiddleware
 from .skills import specialist_skill_source
 
 WORKSPACE = "/workspace"
@@ -43,13 +45,15 @@ _COMPACT_SPECIALIST_FILESYSTEM_TOOLS: list[FsToolName] = [
 ]
 
 
-class SpecialistResult(TypedDict):
+class SpecialistResult(BaseModel):
     """Result returned to the migration lead by every specialist."""
 
-    summary: str
-    findings: list[str]
-    artifact_paths: list[str]
-    escalation: str
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(max_length=200)
+    findings: tuple[Annotated[str, Field(max_length=140)], ...] = Field(max_length=2)
+    artifact_paths: tuple[Annotated[str, Field(max_length=160)], ...] = Field(max_length=4)
+    escalation: str = Field(max_length=120)
     confidence: Literal["HIGH", "MEDIUM", "LOW"]
     self_certified: Literal[False]
 
@@ -509,6 +513,8 @@ def build_migration_subagents(
                 middleware=[
                     SpecialistTraceMiddleware(profile),
                     filesystem_middleware,
+                    BinaryArtifactReadGuardMiddleware(),
+                    ShowcaseContextBudgetMiddleware(),
                 ],
                 name=profile.name,
                 response_format=SpecialistResult,

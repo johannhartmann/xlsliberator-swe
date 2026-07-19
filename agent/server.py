@@ -168,6 +168,8 @@ from .xlsliberator.middleware import (
 )
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.model_limits import (
+    BinaryArtifactReadGuardMiddleware,
+    ShowcaseContextBudgetMiddleware,
     bound_showcase_model_kwargs,
     register_showcase_harness_profile,
     showcase_system_prompt,
@@ -1263,6 +1265,14 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                 notify_step_limit_reached,
                 *fallback_middleware,
                 *plan_mode_middleware,
+                *(
+                    [
+                        BinaryArtifactReadGuardMiddleware(),
+                        ShowcaseContextBudgetMiddleware(),
+                    ]
+                    if compact_showcase
+                    else []
+                ),
                 *(
                     [
                         ExcludeToolsMiddleware(
