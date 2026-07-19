@@ -203,8 +203,8 @@ async def test_task_retry_wraps_inside_tool_error_middleware() -> None:
 async def test_migration_uses_explicit_primary_and_specialist_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("XLSLIBERATOR_PRIMARY_MODEL", "openai:openai/gpt-4.1")
-    monkeypatch.setenv("XLSLIBERATOR_SPECIALIST_MODEL", "openai:openai/gpt-4.1")
+    monkeypatch.setenv("XLSLIBERATOR_PRIMARY_MODEL", "openai:openai/gpt-4.1-mini")
+    monkeypatch.setenv("XLSLIBERATOR_SPECIALIST_MODEL", "openai:openai/gpt-4.1-mini")
     config = _base_config()
     configurable = config.setdefault("configurable", {})
     assert isinstance(configurable, dict)
@@ -215,8 +215,8 @@ async def test_migration_uses_explicit_primary_and_specialist_models(
     calls = captured["model_calls"]
     assert isinstance(calls, list)
     assert [call[0] for call in calls] == [
-        "openai:openai/gpt-4.1",
-        "openai:openai/gpt-4.1",
+        "openai:openai/gpt-4.1-mini",
+        "openai:openai/gpt-4.1-mini",
     ]
     assert calls[0][1]["max_tokens"] > 0
     assert "reasoning" not in calls[0][1]

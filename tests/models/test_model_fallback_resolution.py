@@ -52,13 +52,18 @@ def test_supported_openai_models_include_gpt_5_5_and_gpt_5_6() -> None:
         ("openai:gpt-5.6-terra", "GPT-5.6 Terra"),
         ("openai:gpt-5.6-luna", "GPT-5.6 Luna"),
         ("openai:openai/gpt-4.1", "GitHub Models GPT-4.1"),
+        ("openai:openai/gpt-4.1-mini", "GitHub Models GPT-4.1 mini"),
     ]
 
 
-def test_github_models_gpt_4_1_has_non_reasoning_profile() -> None:
-    assert model_default_effort("openai:openai/gpt-4.1") == "none"
-    assert model_supports_reasoning("openai:openai/gpt-4.1") is False
-    option = next(option for option in SUPPORTED_MODELS if option["id"] == "openai:openai/gpt-4.1")
+@pytest.mark.parametrize(
+    "model_id",
+    ["openai:openai/gpt-4.1", "openai:openai/gpt-4.1-mini"],
+)
+def test_github_models_gpt_4_1_family_has_non_reasoning_profile(model_id: str) -> None:
+    assert model_default_effort(model_id) == "none"
+    assert model_supports_reasoning(model_id) is False
+    option = next(option for option in SUPPORTED_MODELS if option["id"] == model_id)
     assert option.get("context_window") == 8_000
 
 

@@ -82,6 +82,15 @@ SUPPORTED_MODELS: list[ModelOption] = [
         "context_window": 8_000,
     },
     {
+        "id": "openai:openai/gpt-4.1-mini",
+        "label": "GitHub Models GPT-4.1 mini",
+        "efforts": ["none"],
+        "default_effort": "none",
+        "supports_images": True,
+        "supports_reasoning": False,
+        "context_window": 8_000,
+    },
+    {
         "id": "google_genai:gemini-3.5-flash",
         "label": "Gemini 3.5 Flash",
         "efforts": ["minimal", "low", "medium", "high"],
