@@ -6,6 +6,8 @@
     "migration/plan.md",
     "migration/source/",
     "migration/candidates/",
+    "migration/generated/candidate/",
+    "migration/generated/candidate.zip",
     "migration/output/target.ods",
     "migration/generated/",
     "migration/acceptance/scenarios.json",

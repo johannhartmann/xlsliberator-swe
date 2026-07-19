@@ -22,6 +22,8 @@ GOLDEN_MIGRATION_PATHS: Final[tuple[str, ...]] = (
     "migration/plan.md",
     "migration/source/",
     "migration/candidates/",
+    "migration/generated/candidate/",
+    "migration/generated/candidate.zip",
     "migration/output/target.ods",
     "migration/generated/",
     "migration/acceptance/scenarios.json",
@@ -173,17 +175,6 @@ mutation scenarios. `migration/unresolved.md` always exists, even when it says
 there are no unresolved findings. Reviewer evidence must be independent.
 Generic fixes additionally require minimized failing-before/passing-after
 regression, affected-corpus evidence, and a skill or capability update.
-
-For the public interactive-game showcase source identified by SHA-256
-`da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1`,
-the opaque hidden-corpus repair ID is `interactive-game`. Pass it verbatim to
-`request_independent_migration_review`; it selects hidden tests but reveals no
-hidden definition. Assemble the complete public evidence under
-`migration/generated/public-showcase/` using the read-only
-`/opt/xlsliberator-showcase/showcase.py` contract. Validate that directory with
-the Docker-contained CLI, then publish the same validated bytes as
-`migration/generated/public-showcase.zip`. A partial or unvalidated archive is
-not deliverable.
 """.strip()
 
 SHOWCASE_SPECIALIST_NAMES: Final[tuple[str, ...]] = (
@@ -194,9 +185,9 @@ SHOWCASE_SPECIALIST_NAMES: Final[tuple[str, ...]] = (
 )
 SHOWCASE_MCP_TOOL_NAMES: Final[frozenset[str]] = frozenset(
     {
-        "xlsliberator_runtime_build_interactive_game_target",
-        "xlsliberator_runtime_run_interactive_game_scenario",
-        "xlsliberator_runtime_bundle_interactive_game_replays",
+        "xlsliberator_runtime_build_application_candidate",
+        "xlsliberator_runtime_run_application_scenario",
+        "xlsliberator_runtime_bundle_application_replays",
     }
 )
 SHOWCASE_MIGRATION_PROMPT: Final[str] = """
@@ -219,6 +210,13 @@ introduce VBA, LibreOffice Basic event binding, COM or Office automation,
 Windows DLLs, Excel, proprietary add-ins, an Excel compatibility facade, or a
 custom semantic runtime.
 
+The trusted runtime is generic: it knows only a versioned, content-bound
+candidate contract. It does not know this workbook, its hash, its sheets, its
+controls, its rules, or its scenarios. Derive the implementation from the
+hydrated original source and specialist findings. Do not copy a repository
+demo candidate, invoke a source-specific translator path, or add a special case
+for this fixture.
+
 Required workflow:
 
 1. Use `task` to run exactly these four independent specialists with their
@@ -228,33 +226,47 @@ Required workflow:
 2. Maintain `migration/dossier.md`, `migration/plan.md`, the complete source
    tree, specialist trajectories, and source-derived acceptance/mutation
    artifacts. The plan must map every public behavior to tests and mutations.
-3. Build `migration/output/target.ods` with
-   `xlsliberator_runtime_build_interactive_game_target`.
-4. Run all five canonical GUI scenarios with
-   `xlsliberator_runtime_run_interactive_game_scenario` and retain real
+3. For this high-complexity source, produce at least two isolated direct
+   target-native candidate implementations, test them against the same
+   source-derived behaviors and mutations, record the tournament, and promote
+   only the stronger candidate. Assemble the winner under
+   `migration/generated/candidate/` with a complete `manifest.json`, source
+   digest, LibreOffice build, declared entrypoints, exact file digests, and
+   capability declarations. Package those exact files as
+   `migration/generated/candidate.zip`.
+4. Build `migration/output/target.ods` with
+   `xlsliberator_runtime_build_application_candidate`, passing the immutable
+   original workbook and `migration/generated/candidate.zip`. A build that does
+   not consume the generated candidate bundle is invalid.
+5. Run all five canonical GUI scenarios with
+   `xlsliberator_runtime_run_application_scenario` and retain real
    operations and evidence: `keyboard-control`, `timer-tick`, `native-controls`,
    `document-events`, and `line-collapse`. Prove open, recalculation, pointer
    and keyboard interaction, control/events, assertions, save, close, reopen,
-   persistence, and screenshots. Bundle all five replays with
-   `xlsliberator_runtime_bundle_interactive_game_replays`.
-5. Run source-derived mutations that fail for missing or wrong behavior. Write
+   persistence, and screenshots. Pass the same candidate bundle to every
+   scenario. Bundle the declared replay set with
+   `xlsliberator_runtime_bundle_application_replays` and replay ID
+   `interactive-game`.
+6. Run source-derived mutations that fail for missing or wrong behavior. Write
    `migration/evidence/libreoffice-execution.json`,
    `migration/evidence/save-reopen.json`, and
    `migration/evidence/mutations.json`. Never skip, weaken, fabricate, or treat
    transport success as behavioral success.
-6. Assemble the exact schema from the read-only
+7. Assemble the exact schema from the read-only
    `/opt/xlsliberator-showcase/showcase.py` contract under
-   `migration/generated/public-showcase/`, including the recorded WebM,
-   browser replay, events, versions, Docker services, commands, model calls,
-   zero billed workflow cost, runtime, limitations, hashes, and canonical
-   evidence. Publish identical bytes as
+   `migration/generated/public-showcase/`, including the exact validated
+   candidate ZIP, its manifest identity, the recorded WebM, browser replay,
+   events, versions, Docker services, commands, model calls, zero billed
+   workflow cost, runtime, limitations, hashes, and canonical evidence. Bind
+   the target, every scenario, replay, and reviewer result to the same
+   candidate digest. Publish identical bytes as
    `migration/generated/public-showcase.zip`.
-7. Keep `migration/unresolved.md` truthful. Classify every remaining issue as
+8. Keep `migration/unresolved.md` truthful. Classify every remaining issue as
    `workbook-specific`, `XLSLiberator defect`, `LibreOffice defect`,
    `missing open service`, or `validation defect`. A generic defect requires a
    minimized failing-before/passing-after regression, affected-corpus result,
    and skill or capability update.
-8. Call `request_independent_migration_review` with exact repair ID
+9. Call `request_independent_migration_review` with exact repair ID
    `interactive-game` only after all public evidence exists. Repair every
    finding and rerun a fresh review until it returns APPROVE.
 

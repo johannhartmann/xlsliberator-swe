@@ -53,6 +53,9 @@ def test_reviewer_prompt_covers_behavior_inputs_security_and_three_states() -> N
     for fragment in (
         "original workbook",
         "complete VBA",
+        "candidate manifest",
+        "original source digest",
+        "fixture-specific",
         "source behavior",
         "run_hidden_acceptance",
         "save/close/reopen",
@@ -138,6 +141,8 @@ def test_compact_showcase_reviewer_keeps_hidden_and_liberation_gates() -> None:
     assert len(prompt) < 2_500
     assert "xlsliberator_corpus_run_hidden_acceptance" in prompt
     assert "no VBA" in prompt
+    assert "candidate manifest" in prompt
+    assert "exact candidate bytes" in prompt
     assert "read-only" in prompt
     assert "APPROVE only" in prompt
     assert "reviewed_artifact_sha256: `" + ("d" * 64) + "`" in prompt

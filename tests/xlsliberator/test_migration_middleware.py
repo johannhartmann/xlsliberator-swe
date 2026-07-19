@@ -244,6 +244,9 @@ async def test_evidence_gate_accepts_complete_and_blocks_missing() -> None:
         )
         is None
     )
+    command = complete.commands[-1]
+    assert "generated/candidate.zip" in command
+    assert "evidence/mutations.json" in command
 
     missing = FakeSandbox(
         lambda _command: ExecuteResponse(output="missing=reviewer result\n", exit_code=1)

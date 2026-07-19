@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      XLSLIBERATOR_SOURCE_COMMIT: 17c8e4e715ef30569cf81830229d4c9ba8ac9903
+      XLSLIBERATOR_SOURCE_COMMIT: 2451d8ecb1f20cc9bd00264d009d8cc79e9e005c
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
       GUI_IMAGE: xlsliberator-libreoffice-gui:26.2.4.2
       APP_IMAGE: xlsliberator-app:showcase
@@ -239,7 +239,7 @@ jobs:
           test "$source_sha" = \
             da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1
           source_base64="$(base64 -w 0 "$source_path")"
-          requirements='Run the complete first autonomous interactive-game showcase. Spawn workbook-forensics, vba-liberation-engineer, ui-migration-engineer, and test-adversary specialists with isolated evidence. Build the direct native LibreOffice target using xlsliberator_runtime_build_interactive_game_target. Execute all five canonical public GUI scenarios, real open/recalculate/interactions/events/save/close/reopen/assertions, source-derived mutation tests, liberation checks, and a replay bundle. Call request_independent_migration_review with repair_id interactive-game. Assemble migration/generated/public-showcase/ against the exact read-only /opt/xlsliberator-showcase/showcase.py schema, validate it inside the sandbox, and publish the identical validated bytes as migration/generated/public-showcase.zip. Do not fabricate, skip, weaken, or self-certify evidence. Record exact Docker services, LibreOffice 26.2.4.2, GitHub Models openai/gpt-4.1, calls, zero billed workflow cost, runtime, limitations, and all required canonical artifacts. Finish only after a fresh independent APPROVE and strict bundle validation.'
+          requirements='Run the complete first autonomous interactive-game showcase. Spawn workbook-forensics, vba-liberation-engineer, ui-migration-engineer, and test-adversary specialists with isolated evidence. Derive at least two independent direct Python/UNO candidates from the hydrated original workbook, run a fair source-derived tournament, and package only the winner as migration/generated/candidate.zip using the generic content-bound candidate contract. Do not copy the repository demo candidate or add a fixture-specific runtime path. Build the native LibreOffice target with xlsliberator_runtime_build_application_candidate, passing both the immutable source workbook and the generated candidate ZIP. Execute all five canonical public GUI scenarios with that same candidate ZIP, real open/recalculate/interactions/events/save/close/reopen/assertions, source-derived mutation tests, liberation checks, and a replay bundle. Bind candidate, target, scenario, replay, and reviewer digests. Call request_independent_migration_review with repair_id interactive-game. Assemble migration/generated/public-showcase/ against the exact read-only /opt/xlsliberator-showcase/showcase.py schema, including the validated candidate ZIP, and publish the identical validated bytes as migration/generated/public-showcase.zip. Do not fabricate, skip, weaken, or self-certify evidence. Record exact Docker services, LibreOffice 26.2.4.2, GitHub Models openai/gpt-4.1, calls, zero billed workflow cost, runtime, limitations, and all required canonical artifacts. Finish only after a fresh independent APPROVE and strict bundle validation.'
           jq -n \
             --arg owner "${SHOWCASE_OWNER}" \
             --arg sha "$source_sha" \
@@ -362,6 +362,7 @@ jobs:
           jq -e '
             (map(.name) | index("dossier.md")) != null and
             (map(.name) | index("plan.md")) != null and
+            (map(.name) | index("candidate.zip")) != null and
             (map(.name) | index("target.ods")) != null and
             (map(.name) | index("scenarios.json")) != null and
             (map(.name) | index("libreoffice-execution.json")) != null and
@@ -386,6 +387,7 @@ jobs:
           jq -e '.state == "APPROVE"' "${artifacts}/evidence-result.json"
           jq -e '.status == "passed" or .status == "PASSED"' \
             "${artifacts}/evidence-mutations.json"
+          test -s "${artifacts}/generated-candidate.zip"
           test -s "${artifacts}/ods-target.ods"
           test -s "${artifacts}/showcase-recording-showcase.webm"
           test -s "${artifacts}/showcase-replay-index.html"
@@ -403,6 +405,8 @@ jobs:
             .status == "PASSED" and
             .release_ready == true and
             .target_build == "26.2.4.2" and
+            (.candidate_id | length) > 1 and
+            (.candidate_sha256 | test("^[0-9a-f]{64}$")) and
             .reviewer_state == "APPROVE"
           ' "${SHOWCASE_OUTPUT}/bundle-validation.json"
           sha256sum "${artifacts}"/* > "${SHOWCASE_OUTPUT}/SHA256SUMS"

@@ -49,8 +49,8 @@ def test_lead_prompt_contains_ordered_fourteen_stage_loop() -> None:
     assert "originating UI or channel" in MIGRATION_LEAD_PROMPT
     assert "candidate tournament" in MIGRATION_LEAD_PROMPT
     assert "Treat outputs as private" in MIGRATION_LEAD_PROMPT
-    assert "opaque hidden-corpus repair ID is `interactive-game`" in MIGRATION_LEAD_PROMPT
-    assert "migration/generated/public-showcase.zip" in MIGRATION_LEAD_PROMPT
+    assert "interactive-game" not in MIGRATION_LEAD_PROMPT
+    assert "da1bddc2" not in MIGRATION_LEAD_PROMPT
 
 
 def test_showcase_prompt_is_bounded_and_preserves_every_acceptance_gate() -> None:
@@ -65,9 +65,9 @@ def test_showcase_prompt_is_bounded_and_preserves_every_acceptance_gate() -> Non
         "test-adversary",
     }
     assert SHOWCASE_MCP_TOOL_NAMES == {
-        "xlsliberator_runtime_build_interactive_game_target",
-        "xlsliberator_runtime_run_interactive_game_scenario",
-        "xlsliberator_runtime_bundle_interactive_game_replays",
+        "xlsliberator_runtime_build_application_candidate",
+        "xlsliberator_runtime_run_application_scenario",
+        "xlsliberator_runtime_bundle_application_replays",
     }
     for specialist in SHOWCASE_SPECIALIST_NAMES:
         assert specialist in rendered
@@ -84,6 +84,11 @@ def test_showcase_prompt_is_bounded_and_preserves_every_acceptance_gate() -> Non
     for requirement in (
         "LibreOffice full build `26.2.4.2`",
         "source-derived mutations",
+        "migration/generated/candidate.zip",
+        "at least two isolated",
+        "does not know this workbook",
+        "Do not copy a repository demo candidate",
+        "same candidate digest",
         "save, close, reopen",
         "public-showcase.zip",
         "request_independent_migration_review",

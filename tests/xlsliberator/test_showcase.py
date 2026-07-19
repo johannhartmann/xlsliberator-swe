@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
@@ -58,6 +59,37 @@ def _build_bundle(root: Path) -> dict[str, Any]:
         return {"path": path, "sha256": _sha256(content)}
 
     dossier = reference("private-safe/dossier.md")
+    candidate_files = {
+        "candidate_generated/__init__.py": b'"""Generated candidate."""\n',
+        "candidate_generated/adapter.py": (
+            b"def build_target(request):\n    return request\n\n"
+            b"def create_controller(session, document, config):\n"
+            b"    return (session, document, config)\n"
+        ),
+    }
+    candidate_manifest = {
+        "schema_version": "1.0.0",
+        "candidate_id": "source-derived-candidate",
+        "source_sha256": INTERACTIVE_GAME_SOURCE_SHA256,
+        "target_build": "26.2.4.2",
+        "entrypoints": {
+            "build": "candidate_generated.adapter:build_target",
+            "controller": "candidate_generated.adapter:create_controller",
+        },
+        "files": {
+            path: _sha256(content) for path, content in sorted(candidate_files.items())
+        },
+        "capabilities": ["native-controls", "keyboard-events"],
+    }
+    candidate_manifest_bytes = (
+        json.dumps(candidate_manifest, indent=2, sort_keys=True) + "\n"
+    ).encode()
+    candidate_output = BytesIO()
+    with ZipFile(candidate_output, "w") as archive:
+        archive.writestr("manifest.json", candidate_manifest_bytes)
+        for path, content in candidate_files.items():
+            archive.writestr(path, content)
+    candidate = reference("generated/candidate.zip", candidate_output.getvalue())
     target = reference("public/target.ods", b"deterministic-test-ods")
     invocation = reference("evidence/invocation.json")
     specialist_evidence = {
@@ -120,10 +152,23 @@ def _build_bundle(root: Path) -> dict[str, Any]:
             "immutable": True,
             "dossier": dossier,
         },
+        "candidate": {
+            "schema_version": "1.0.0",
+            "candidate_id": "source-derived-candidate",
+            "source_sha256": INTERACTIVE_GAME_SOURCE_SHA256,
+            "target_build": "26.2.4.2",
+            "build_entrypoint": "candidate_generated.adapter:build_target",
+            "controller_entrypoint": "candidate_generated.adapter:create_controller",
+            "file_count": len(candidate_files),
+            "capabilities": ["native-controls", "keyboard-events"],
+            "manifest_sha256": _sha256(candidate_manifest_bytes),
+            "artifact": candidate,
+        },
         "target": {
             "target": "libreoffice",
             "full_build": "26.2.4.2",
             "artifact": target,
+            "built_from_candidate_sha256": candidate["sha256"],
             "runtime_image_digest": f"sha256:{'a' * 64}",
             "playable": True,
         },
@@ -157,6 +202,7 @@ def _build_bundle(root: Path) -> dict[str, Any]:
                 "source_refs": ["dependencies/ModGame.bas"],
                 "oracle_policy": "authored_acceptance_requirements",
                 "status": "PASSED",
+                "candidate_sha256": candidate["sha256"],
                 "evidence": scenario_evidence[scenario],
             }
             for scenario in SCENARIOS
@@ -211,6 +257,7 @@ def _build_bundle(root: Path) -> dict[str, Any]:
             "lead_thread_id": "lead-thread",
             "reviewer_model_id": "review-provider:reviewer",
             "independent_context": True,
+            "reviewed_candidate_sha256": candidate["sha256"],
             "reviewed_target_sha256": target_sha256,
             "reviewed_inputs_sha256": review_inputs["sha256"],
             "mandatory_checks": "PASS",
@@ -229,6 +276,7 @@ def _build_bundle(root: Path) -> dict[str, Any]:
             "privacy": "public-sanitized",
             "replayable": True,
             "covered_scenarios": SCENARIOS,
+            "candidate_sha256": candidate["sha256"],
             "target_sha256": target_sha256,
             "recording": recording,
             "entrypoint": entrypoint,
@@ -316,7 +364,9 @@ def test_complete_showcase_archive_passes_safe_extraction(
 
     assert inspected.release_ready is True
     assert main(["--archive", str(archive)]) == 0
-    assert '"reviewer_state": "APPROVE"' in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert '"candidate_id": "source-derived-candidate"' in output
+    assert '"reviewer_state": "APPROVE"' in output
 
 
 def test_showcase_archive_rejects_path_traversal(tmp_path: Path) -> None:
@@ -399,6 +449,11 @@ def test_reviewer_must_be_independent_current_and_hidden_safe(tmp_path: Path) ->
     with pytest.raises(ValidationError, match="review inputs"):
         ShowcaseBundleManifest.model_validate(stale)
 
+    stale_candidate = deepcopy(payload)
+    stale_candidate["reviewer"]["reviewed_candidate_sha256"] = "f" * 64
+    with pytest.raises(ValidationError, match="generated candidate"):
+        ShowcaseBundleManifest.model_validate(stale_candidate)
+
     leaked = deepcopy(payload)
     leaked["reviewer"]["hidden"]["hidden_definitions_included"] = True
     with pytest.raises(ValidationError):
@@ -446,4 +501,36 @@ def test_paths_hashes_and_artifact_completeness_are_verified(tmp_path: Path) -> 
     extra = tmp_path / "public/unindexed.txt"
     extra.write_text("not indexed\n", encoding="utf-8")
     with pytest.raises(ValueError, match="does not match"):
+        inspect_showcase_bundle(tmp_path)
+
+
+def test_candidate_archive_is_content_bound_and_fail_closed(tmp_path: Path) -> None:
+    payload = _build_bundle(tmp_path)
+
+    wrong_target_binding = deepcopy(payload)
+    wrong_target_binding["target"]["built_from_candidate_sha256"] = "e" * 64
+    with pytest.raises(ValidationError, match="not built from"):
+        ShowcaseBundleManifest.model_validate(wrong_target_binding)
+
+    candidate_path = tmp_path / "generated/candidate.zip"
+    with ZipFile(candidate_path, "a") as archive:
+        archive.writestr("candidate_generated/special_case.py", b"fixture_specific = True\n")
+    tampered = candidate_path.read_bytes()
+    tampered_sha256 = _sha256(tampered)
+    payload["candidate"]["artifact"]["sha256"] = tampered_sha256
+    payload["target"]["built_from_candidate_sha256"] = tampered_sha256
+    payload["reviewer"]["reviewed_candidate_sha256"] = tampered_sha256
+    payload["replay"]["candidate_sha256"] = tampered_sha256
+    for scenario in payload["scenarios"]:
+        scenario["candidate_sha256"] = tampered_sha256
+    indexed_candidate = next(
+        artifact
+        for artifact in payload["artifact_index"]
+        if artifact["path"] == "generated/candidate.zip"
+    )
+    indexed_candidate["sha256"] = tampered_sha256
+    indexed_candidate["bytes"] = len(tampered)
+    _write_manifest(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="inventory does not match"):
         inspect_showcase_bundle(tmp_path)

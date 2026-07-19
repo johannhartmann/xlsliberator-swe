@@ -22,9 +22,9 @@ from .mcp import CuratedTool, MCPServiceHealth, MigrationMCPRegistry
 
 _SHOWCASE_TOOLS = frozenset(
     {
-        "build_interactive_game_target",
-        "run_interactive_game_scenario",
-        "bundle_interactive_game_replays",
+        "build_application_candidate",
+        "run_application_scenario",
+        "bundle_application_replays",
     }
 )
 _BRIDGED_SESSION_TOOLS = frozenset(
@@ -156,11 +156,11 @@ def _handler_for(
 
     async def handler(**arguments: Any) -> dict[str, Any]:
         sandbox = backend()
-        if original_name == "build_interactive_game_target":
+        if original_name == "build_application_candidate":
             return await _bridge_build(item.tool, sandbox, thread_id, root, arguments)
-        if original_name == "run_interactive_game_scenario":
+        if original_name == "run_application_scenario":
             return await _bridge_scenario(item.tool, sandbox, thread_id, root, arguments)
-        if original_name == "bundle_interactive_game_replays":
+        if original_name == "bundle_application_replays":
             return await _bridge_bundle(item.tool, sandbox, thread_id, root, arguments)
         if original_name == "open_document":
             return await _bridge_open(item.tool, sandbox, thread_id, root, arguments)
@@ -188,16 +188,20 @@ async def _bridge_build(
     arguments: Mapping[str, Any],
 ) -> dict[str, Any]:
     source_path = _sandbox_file(arguments, "source_path")
+    candidate_path = _sandbox_file(arguments, "candidate_path")
     output_path = _sandbox_file(arguments, "output_path")
     directory = _call_directory(root, thread_id, "build")
     try:
-        local_source = directory / "source.xlsb"
+        local_source = directory / f"source{_workbook_suffix(source_path)}"
+        local_candidate = directory / "candidate.zip"
         local_output = directory / "target.ods"
         _write_private(local_source, await _download(backend, source_path))
+        _write_private(local_candidate, await _download(backend, candidate_path))
         result = await _invoke(
             tool,
             {
                 "source_path": str(local_source),
+                "candidate_path": str(local_candidate),
                 "output_path": str(local_output),
             },
         )
@@ -216,14 +220,18 @@ async def _bridge_scenario(
     arguments: Mapping[str, Any],
 ) -> dict[str, Any]:
     target_path = _sandbox_file(arguments, "target_path")
+    candidate_path = _sandbox_file(arguments, "candidate_path")
     evidence_path = _sandbox_file(arguments, "evidence_path")
     directory = _call_directory(root, thread_id, "scenario")
     try:
         local_target = directory / "target.ods"
+        local_candidate = directory / "candidate.zip"
         local_evidence = directory / "evidence.zip"
         _write_private(local_target, await _download(backend, target_path))
+        _write_private(local_candidate, await _download(backend, candidate_path))
         forwarded = dict(arguments)
         forwarded["target_path"] = str(local_target)
+        forwarded["candidate_path"] = str(local_candidate)
         forwarded["evidence_path"] = str(local_evidence)
         result = await _invoke(tool, forwarded)
         _require_success(result)
@@ -260,6 +268,7 @@ async def _bridge_bundle(
             {
                 "evidence_paths": local_paths,
                 "output_path": str(local_output),
+                "replay_id": _required_string(arguments, "replay_id"),
             },
         )
         _require_success(result)
@@ -469,6 +478,13 @@ def _required_string(arguments: Mapping[str, Any], name: str) -> str:
     if not isinstance(value, str) or not value or "\x00" in value:
         raise MCPBridgeError(f"{name} must be a non-empty NUL-free string")
     return value
+
+
+def _workbook_suffix(path: str) -> str:
+    suffix = PurePosixPath(path).suffix.lower()
+    if suffix not in {".xls", ".xlsx", ".xlsm", ".xlsb", ".ods"}:
+        raise MCPBridgeError("source_path has an unsupported workbook suffix")
+    return suffix
 
 
 def _safe_component(value: str) -> str:

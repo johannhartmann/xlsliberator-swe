@@ -74,21 +74,32 @@ def _success(**extra: Any) -> dict[str, Any]:
 async def test_build_bridge_transfers_only_explicit_files(tmp_path: Path) -> None:
     observed: dict[str, str] = {}
 
-    async def build(source_path: str, output_path: str) -> dict[str, Any]:
+    async def build(
+        source_path: str,
+        candidate_path: str,
+        output_path: str,
+    ) -> dict[str, Any]:
         observed["source_path"] = source_path
+        observed["candidate_path"] = candidate_path
         observed["output_path"] = output_path
         assert Path(source_path).read_bytes() == b"original-xlsb"
+        assert Path(candidate_path).read_bytes() == b"candidate-bundle"
         Path(output_path).write_bytes(b"native-ods")
         return _success(target_build="26.2.4.2")
 
     tool = StructuredTool.from_function(
         coroutine=build,
-        name="build_interactive_game_target",
+        name="build_application_candidate",
         description="Build target.",
     )
-    backend = _Backend({"/workspace/source/game.xlsb": b"original-xlsb"})
+    backend = _Backend(
+        {
+            "/workspace/source/game.xlsb": b"original-xlsb",
+            "/workspace/migration/generated/candidate.zip": b"candidate-bundle",
+        }
+    )
     registry = bridge_migration_mcp_registry(
-        _registry("build_interactive_game_target", tool),
+        _registry("build_application_candidate", tool),
         backend=lambda: cast(SandboxBackendProtocol, backend),
         thread_id="private-thread",
         bridge_root=str(tmp_path),
@@ -97,32 +108,45 @@ async def test_build_bridge_transfers_only_explicit_files(tmp_path: Path) -> Non
     result = await registry.curated[0].tool.ainvoke(
         {
             "source_path": "/workspace/source/game.xlsb",
+            "candidate_path": "/workspace/migration/generated/candidate.zip",
             "output_path": "/workspace/migration/output/target.ods",
         }
     )
 
     assert result["success"] is True
-    assert backend.downloads == ["/workspace/source/game.xlsb"]
+    assert backend.downloads == [
+        "/workspace/source/game.xlsb",
+        "/workspace/migration/generated/candidate.zip",
+    ]
     assert backend.uploads == ["/workspace/migration/output/target.ods"]
     assert backend.files["/workspace/migration/output/target.ods"] == b"native-ods"
     assert observed["source_path"].startswith(f"{tmp_path}/")
+    assert observed["candidate_path"].startswith(f"{tmp_path}/")
     assert observed["output_path"].startswith(f"{tmp_path}/")
     assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.asyncio
 async def test_bridge_rejects_paths_outside_sandbox_workspace(tmp_path: Path) -> None:
-    async def build(source_path: str, output_path: str) -> dict[str, Any]:
-        return _success(source_path=source_path, output_path=output_path)
+    async def build(
+        source_path: str,
+        candidate_path: str,
+        output_path: str,
+    ) -> dict[str, Any]:
+        return _success(
+            source_path=source_path,
+            candidate_path=candidate_path,
+            output_path=output_path,
+        )
 
     tool = StructuredTool.from_function(
         coroutine=build,
-        name="build_interactive_game_target",
+        name="build_application_candidate",
         description="Build target.",
     )
     backend = _Backend({})
     registry = bridge_migration_mcp_registry(
-        _registry("build_interactive_game_target", tool),
+        _registry("build_application_candidate", tool),
         backend=lambda: cast(SandboxBackendProtocol, backend),
         thread_id="private-thread",
         bridge_root=str(tmp_path),
@@ -132,6 +156,7 @@ async def test_bridge_rejects_paths_outside_sandbox_workspace(tmp_path: Path) ->
         await registry.curated[0].tool.ainvoke(
             {
                 "source_path": "/etc/passwd",
+                "candidate_path": "/workspace/migration/generated/candidate.zip",
                 "output_path": "/workspace/migration/output/target.ods",
             }
         )
@@ -141,17 +166,25 @@ async def test_bridge_rejects_paths_outside_sandbox_workspace(tmp_path: Path) ->
 
 
 def test_path_bearing_tools_are_hidden_without_configured_bridge() -> None:
-    async def build(source_path: str, output_path: str) -> dict[str, Any]:
-        return _success(source_path=source_path, output_path=output_path)
+    async def build(
+        source_path: str,
+        candidate_path: str,
+        output_path: str,
+    ) -> dict[str, Any]:
+        return _success(
+            source_path=source_path,
+            candidate_path=candidate_path,
+            output_path=output_path,
+        )
 
     tool = StructuredTool.from_function(
         coroutine=build,
-        name="build_interactive_game_target",
+        name="build_application_candidate",
         description="Build target.",
     )
 
     registry = bridge_migration_mcp_registry(
-        _registry("build_interactive_game_target", tool),
+        _registry("build_application_candidate", tool),
         backend=lambda: cast(SandboxBackendProtocol, _Backend({})),
         thread_id="private-thread",
         bridge_root=None,
@@ -164,27 +197,36 @@ def test_path_bearing_tools_are_hidden_without_configured_bridge() -> None:
 
 
 def test_bridge_preserves_mcp_json_schema_without_root_wrapper(tmp_path: Path) -> None:
-    async def build(source_path: str, output_path: str) -> dict[str, Any]:
-        return _success(source_path=source_path, output_path=output_path)
+    async def build(
+        source_path: str,
+        candidate_path: str,
+        output_path: str,
+    ) -> dict[str, Any]:
+        return _success(
+            source_path=source_path,
+            candidate_path=candidate_path,
+            output_path=output_path,
+        )
 
     schema = {
         "type": "object",
         "properties": {
             "source_path": {"type": "string"},
+            "candidate_path": {"type": "string"},
             "output_path": {"type": "string"},
         },
-        "required": ["source_path", "output_path"],
+        "required": ["source_path", "candidate_path", "output_path"],
         "additionalProperties": False,
     }
     tool = StructuredTool(
-        name="build_interactive_game_target",
+        name="build_application_candidate",
         description="Build target.",
         args_schema=schema,
         coroutine=build,
     )
 
     registry = bridge_migration_mcp_registry(
-        _registry("build_interactive_game_target", tool),
+        _registry("build_application_candidate", tool),
         backend=lambda: cast(SandboxBackendProtocol, _Backend({})),
         thread_id="private-thread",
         bridge_root=str(tmp_path),
@@ -199,6 +241,122 @@ def test_bridge_preserves_mcp_json_schema_without_root_wrapper(tmp_path: Path) -
     }
     assert isinstance(tool_call_schema, dict)
     assert "root" not in tool_call_schema["properties"]
+
+
+@pytest.mark.asyncio
+async def test_scenario_bridge_binds_target_candidate_and_evidence(tmp_path: Path) -> None:
+    async def run_scenario(
+        target_path: str,
+        candidate_path: str,
+        evidence_path: str,
+        scenario_id: str,
+        actions: list[dict[str, Any]],
+        adapter_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert Path(target_path).read_bytes() == b"native-ods"
+        assert Path(candidate_path).read_bytes() == b"candidate-bundle"
+        assert scenario_id == "keyboard-control"
+        assert actions == [{"kind": "key", "value": "LEFT"}]
+        assert adapter_config == {"sheet": "Game"}
+        Path(evidence_path).write_bytes(b"real-gui-evidence")
+        return _success(
+            target_build="26.2.4.2",
+            candidate_bundle_sha256="a" * 64,
+        )
+
+    tool = StructuredTool.from_function(
+        coroutine=run_scenario,
+        name="run_application_scenario",
+        description="Run application scenario.",
+    )
+    backend = _Backend(
+        {
+            "/workspace/migration/output/target.ods": b"native-ods",
+            "/workspace/migration/generated/candidate.zip": b"candidate-bundle",
+        }
+    )
+    registry = bridge_migration_mcp_registry(
+        _registry("run_application_scenario", tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    result = await registry.curated[0].tool.ainvoke(
+        {
+            "target_path": "/workspace/migration/output/target.ods",
+            "candidate_path": "/workspace/migration/generated/candidate.zip",
+            "evidence_path": "/workspace/migration/evidence/keyboard-control.zip",
+            "scenario_id": "keyboard-control",
+            "actions": [{"kind": "key", "value": "LEFT"}],
+            "adapter_config": {"sheet": "Game"},
+        }
+    )
+
+    assert result["success"] is True
+    assert backend.downloads == [
+        "/workspace/migration/output/target.ods",
+        "/workspace/migration/generated/candidate.zip",
+    ]
+    assert backend.uploads == ["/workspace/migration/evidence/keyboard-control.zip"]
+    assert (
+        backend.files["/workspace/migration/evidence/keyboard-control.zip"]
+        == b"real-gui-evidence"
+    )
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_replay_bridge_forwards_declared_replay_id(tmp_path: Path) -> None:
+    async def bundle_replays(
+        evidence_paths: dict[str, str],
+        output_path: str,
+        replay_id: str,
+    ) -> dict[str, Any]:
+        assert replay_id == "interactive-game"
+        assert set(evidence_paths) == {"keyboard-control", "timer-tick"}
+        assert {
+            scenario: Path(path).read_bytes() for scenario, path in evidence_paths.items()
+        } == {
+            "keyboard-control": b"keyboard-evidence",
+            "timer-tick": b"timer-evidence",
+        }
+        Path(output_path).write_bytes(b"replay-bundle")
+        return _success(target_build="26.2.4.2")
+
+    tool = StructuredTool.from_function(
+        coroutine=bundle_replays,
+        name="bundle_application_replays",
+        description="Bundle replay.",
+    )
+    backend = _Backend(
+        {
+            "/workspace/migration/evidence/keyboard-control.zip": b"keyboard-evidence",
+            "/workspace/migration/evidence/timer-tick.zip": b"timer-evidence",
+        }
+    )
+    registry = bridge_migration_mcp_registry(
+        _registry("bundle_application_replays", tool),
+        backend=lambda: cast(SandboxBackendProtocol, backend),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    result = await registry.curated[0].tool.ainvoke(
+        {
+            "evidence_paths": {
+                "keyboard-control": "/workspace/migration/evidence/keyboard-control.zip",
+                "timer-tick": "/workspace/migration/evidence/timer-tick.zip",
+            },
+            "output_path": "/workspace/migration/public/replay.zip",
+            "replay_id": "interactive-game",
+        }
+    )
+
+    assert result["success"] is True
+    assert backend.uploads == ["/workspace/migration/public/replay.zip"]
+    assert backend.files["/workspace/migration/public/replay.zip"] == b"replay-bundle"
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.asyncio

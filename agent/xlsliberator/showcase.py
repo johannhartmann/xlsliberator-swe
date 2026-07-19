@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import stat
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -20,6 +21,14 @@ LIBREOFFICE_BUILD = "26.2.4.2"
 MAX_ARCHIVE_FILES = 500
 MAX_ARCHIVE_FILE_BYTES = 256 * 1024 * 1024
 MAX_ARCHIVE_TOTAL_BYTES = 512 * 1024 * 1024
+MAX_CANDIDATE_FILES = 100
+MAX_CANDIDATE_FILE_BYTES = 4 * 1024 * 1024
+MAX_CANDIDATE_TOTAL_BYTES = 16 * 1024 * 1024
+_CANDIDATE_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{1,127}$")
+_CANDIDATE_ENTRYPOINT = re.compile(
+    r"^(?P<module>candidate_[a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*):"
+    r"(?P<callable>[a-zA-Z_][a-zA-Z0-9_]*)$"
+)
 PUBLIC_SCENARIOS = frozenset(
     {
         "keyboard-control",
@@ -113,6 +122,7 @@ class TargetIdentity(StrictModel):
     target: Literal["libreoffice"] = "libreoffice"
     full_build: Literal["26.2.4.2"] = LIBREOFFICE_BUILD
     artifact: ArtifactRef
+    built_from_candidate_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     runtime_image_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     playable: Literal[True] = True
 
@@ -120,6 +130,33 @@ class TargetIdentity(StrictModel):
     def target_is_an_ods_application(self) -> Self:
         if not self.artifact.path.endswith(".ods"):
             raise ValueError("showcase target must be an ODS application")
+        return self
+
+
+class CandidateIdentity(StrictModel):
+    """Generated direct implementation bound to source, target, and exact bytes."""
+
+    schema_version: Literal["1.0.0"] = "1.0.0"
+    candidate_id: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{1,127}$")
+    source_sha256: Literal[
+        "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
+    ] = INTERACTIVE_GAME_SOURCE_SHA256
+    target_build: Literal["26.2.4.2"] = LIBREOFFICE_BUILD
+    build_entrypoint: str = Field(min_length=1, max_length=300)
+    controller_entrypoint: str = Field(min_length=1, max_length=300)
+    file_count: int = Field(ge=2, le=MAX_CANDIDATE_FILES - 1)
+    capabilities: tuple[str, ...]
+    manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    artifact: ArtifactRef
+
+    @model_validator(mode="after")
+    def entrypoints_are_direct_candidate_modules(self) -> Self:
+        if _CANDIDATE_ENTRYPOINT.fullmatch(self.build_entrypoint) is None:
+            raise ValueError("candidate build entrypoint is malformed")
+        if _CANDIDATE_ENTRYPOINT.fullmatch(self.controller_entrypoint) is None:
+            raise ValueError("candidate controller entrypoint is malformed")
+        if len(self.capabilities) != len(set(self.capabilities)):
+            raise ValueError("candidate capabilities must be unique")
         return self
 
 
@@ -174,6 +211,7 @@ class ScenarioEvidence(StrictModel):
     source_refs: tuple[str, ...] = Field(min_length=1)
     oracle_policy: Literal["authored_acceptance_requirements"] = "authored_acceptance_requirements"
     status: Literal["PASSED"] = "PASSED"
+    candidate_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     evidence: ArtifactRef
 
 
@@ -291,6 +329,7 @@ class ReviewerEvidence(StrictModel):
     lead_thread_id: str = Field(min_length=1, max_length=200)
     reviewer_model_id: str = Field(min_length=1, max_length=200)
     independent_context: Literal[True] = True
+    reviewed_candidate_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     reviewed_target_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     reviewed_inputs_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     mandatory_checks: Literal["PASS"] = "PASS"
@@ -311,6 +350,7 @@ class ReplayEvidence(StrictModel):
     privacy: Literal["public-sanitized"] = "public-sanitized"
     replayable: Literal[True] = True
     covered_scenarios: tuple[str, ...] = Field(min_length=5, max_length=5)
+    candidate_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     target_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     recording: ArtifactRef
     entrypoint: ArtifactRef
@@ -393,6 +433,7 @@ class ShowcaseBundleManifest(StrictModel):
     privacy: Literal["public-sanitized"] = "public-sanitized"
     lead_thread_id: str = Field(min_length=1, max_length=200)
     source: SourceIdentity
+    candidate: CandidateIdentity
     target: TargetIdentity
     invocation: InvocationEvidence
     specialists: tuple[SpecialistTrajectory, ...]
@@ -446,11 +487,20 @@ class ShowcaseBundleManifest(StrictModel):
             raise ValueError("showcase lifecycle is incomplete or out of order")
 
     def _validate_cross_references(self) -> None:
+        candidate_sha256 = self.candidate.artifact.sha256
         target_sha256 = self.target.artifact.sha256
+        if self.candidate.source_sha256 != self.source.sha256:
+            raise ValueError("generated candidate is stale for the original source")
+        if self.candidate.target_build != self.target.full_build:
+            raise ValueError("generated candidate targets a different LibreOffice build")
+        if self.target.built_from_candidate_sha256 != candidate_sha256:
+            raise ValueError("target was not built from the reviewed candidate")
         if self.invocation.thread_id != self.lead_thread_id:
             raise ValueError("public invocation must identify the lead thread")
         if self.reviewer.lead_thread_id != self.lead_thread_id:
             raise ValueError("reviewer result is bound to a different lead thread")
+        if self.reviewer.reviewed_candidate_sha256 != candidate_sha256:
+            raise ValueError("reviewer result is stale for the generated candidate")
         if self.reviewer.reviewed_target_sha256 != target_sha256:
             raise ValueError("reviewer result is stale for the target")
         if self.reviewer.reviewed_inputs_sha256 != self.review_inputs.sha256:
@@ -459,6 +509,12 @@ class ShowcaseBundleManifest(StrictModel):
             raise ValueError("liberation evidence is stale for the target")
         if self.replay.target_sha256 != target_sha256:
             raise ValueError("replay evidence is stale for the target")
+        if self.replay.candidate_sha256 != candidate_sha256:
+            raise ValueError("replay evidence used a different generated candidate")
+        if any(
+            scenario.candidate_sha256 != candidate_sha256 for scenario in self.scenarios
+        ):
+            raise ValueError("a public scenario used a different generated candidate")
 
     def _validate_models(self) -> None:
         expected = {
@@ -497,6 +553,7 @@ class ShowcaseBundleManifest(StrictModel):
         """Return every content-bound file referenced by the manifest."""
         references: list[ArtifactRef] = [
             self.source.dossier,
+            self.candidate.artifact,
             self.target.artifact,
             self.invocation.evidence,
             *(specialist.evidence for specialist in self.specialists),
@@ -551,7 +608,124 @@ def inspect_showcase_bundle(directory: Path) -> ShowcaseBundleManifest:
             raise ValueError(f"showcase artifact byte count mismatch: {artifact.path}")
         if hashlib.sha256(payload).hexdigest() != artifact.sha256:
             raise ValueError(f"showcase artifact hash mismatch: {artifact.path}")
+    _inspect_candidate_archive(_confined_file(root, manifest.candidate.artifact.path), manifest)
     return manifest
+
+
+def _inspect_candidate_archive(
+    archive_path: Path,
+    showcase: ShowcaseBundleManifest,
+) -> None:
+    """Validate the nested runtime candidate contract without executing it."""
+    candidate = showcase.candidate
+    try:
+        with ZipFile(archive_path) as archive:
+            infos = archive.infolist()
+            if not 2 <= len(infos) <= MAX_CANDIDATE_FILES:
+                raise ValueError("candidate archive has an invalid file count")
+            names: set[str] = set()
+            total_bytes = 0
+            for info in infos:
+                name = _safe_candidate_path(info.filename)
+                mode = info.external_attr >> 16
+                if (
+                    info.is_dir()
+                    or stat.S_ISLNK(mode)
+                    or info.flag_bits & 0x1
+                    or name in names
+                ):
+                    raise ValueError("candidate archive contains an unsafe member")
+                if info.file_size > MAX_CANDIDATE_FILE_BYTES:
+                    raise ValueError(f"candidate archive member is oversized: {name}")
+                total_bytes += info.file_size
+                if total_bytes > MAX_CANDIDATE_TOTAL_BYTES:
+                    raise ValueError("candidate archive exceeds its expanded size limit")
+                names.add(name)
+            if "manifest.json" not in names:
+                raise ValueError("candidate archive has no manifest.json")
+            manifest_bytes = archive.read("manifest.json")
+            if hashlib.sha256(manifest_bytes).hexdigest() != candidate.manifest_sha256:
+                raise ValueError("candidate manifest hash does not match showcase evidence")
+            try:
+                payload = json.loads(manifest_bytes)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError("candidate manifest is not valid JSON") from exc
+            _validate_candidate_manifest(payload, candidate, names, archive)
+    except BadZipFile as exc:
+        raise ValueError("candidate artifact is not a valid ZIP file") from exc
+
+
+def _validate_candidate_manifest(
+    payload: object,
+    candidate: CandidateIdentity,
+    names: set[str],
+    archive: ZipFile,
+) -> None:
+    if not isinstance(payload, dict):
+        raise ValueError("candidate manifest must be an object")
+    expected_keys = {
+        "schema_version",
+        "candidate_id",
+        "source_sha256",
+        "target_build",
+        "entrypoints",
+        "files",
+        "capabilities",
+    }
+    if set(payload) != expected_keys:
+        raise ValueError("candidate manifest has missing or unknown fields")
+    expected_values = {
+        "schema_version": candidate.schema_version,
+        "candidate_id": candidate.candidate_id,
+        "source_sha256": candidate.source_sha256,
+        "target_build": candidate.target_build,
+    }
+    if any(payload[key] != value for key, value in expected_values.items()):
+        raise ValueError("candidate manifest identity disagrees with showcase evidence")
+    entrypoints = payload["entrypoints"]
+    if entrypoints != {
+        "build": candidate.build_entrypoint,
+        "controller": candidate.controller_entrypoint,
+    }:
+        raise ValueError("candidate manifest entrypoints disagree with showcase evidence")
+    files = payload["files"]
+    if not isinstance(files, dict) or len(files) != candidate.file_count:
+        raise ValueError("candidate manifest file count disagrees with showcase evidence")
+    if names != {"manifest.json", *files}:
+        raise ValueError("candidate manifest inventory does not match its archive")
+    for name, digest in files.items():
+        if not isinstance(name, str) or not isinstance(digest, str):
+            raise ValueError("candidate manifest file inventory is malformed")
+        _safe_candidate_path(name)
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("candidate manifest file digest is malformed")
+        if hashlib.sha256(archive.read(name)).hexdigest() != digest:
+            raise ValueError(f"candidate file digest mismatch: {name}")
+    capabilities = payload["capabilities"]
+    if not isinstance(capabilities, list) or tuple(capabilities) != candidate.capabilities:
+        raise ValueError("candidate capabilities disagree with showcase evidence")
+    for entrypoint in (candidate.build_entrypoint, candidate.controller_entrypoint):
+        match = _CANDIDATE_ENTRYPOINT.fullmatch(entrypoint)
+        if match is None:
+            raise ValueError("candidate entrypoint is malformed")
+        module_path = f"{match.group('module').replace('.', '/')}.py"
+        package_init = f"{match.group('module').partition('.')[0]}/__init__.py"
+        if module_path not in files or package_init not in files:
+            raise ValueError("candidate entrypoint module or package is absent")
+
+
+def _safe_candidate_path(value: str) -> str:
+    path = PurePosixPath(value)
+    if (
+        not value
+        or path.is_absolute()
+        or ".." in path.parts
+        or "." in path.parts
+        or "\\" in value
+        or value != path.as_posix()
+    ):
+        raise ValueError(f"candidate archive path is unsafe: {value}")
+    return value
 
 
 def inspect_showcase_archive(archive_path: Path) -> ShowcaseBundleManifest:
@@ -646,6 +820,8 @@ def main(argv: list[str] | None = None) -> int:
                 "status": manifest.status,
                 "release_ready": manifest.release_ready,
                 "target_build": manifest.target.full_build,
+                "candidate_id": manifest.candidate.candidate_id,
+                "candidate_sha256": manifest.candidate.artifact.sha256,
                 "reviewer_state": manifest.reviewer.state,
             },
             sort_keys=True,

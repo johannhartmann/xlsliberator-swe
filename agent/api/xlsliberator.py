@@ -68,10 +68,12 @@ _REQUIRED_FINAL_ARTIFACTS = frozenset(
     {
         "dossier.md",
         "plan.md",
+        "generated/candidate.zip",
         "output/target.ods",
         "acceptance/scenarios.json",
         "evidence/libreoffice-execution.json",
         "evidence/save-reopen.json",
+        "evidence/mutations.json",
         "unresolved.md",
         "reviewer/result.json",
     }
