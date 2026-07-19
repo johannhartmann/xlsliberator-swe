@@ -17,6 +17,7 @@ from typing import Any
 
 from deepagents.backends.protocol import SandboxBackendProtocol
 from langchain_core.tools import BaseTool, StructuredTool
+
 from .mcp import CuratedTool, MCPServiceHealth, MigrationMCPRegistry
 
 _SHOWCASE_TOOLS = frozenset(
