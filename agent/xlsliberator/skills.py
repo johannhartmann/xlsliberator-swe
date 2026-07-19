@@ -290,8 +290,8 @@ async def _materialize_project_skills(
             "set -eu",
             f"test -d {quoted_source}",
             f"test -r {quoted_identity}",
-            f"identity=$(jq -er '.image.xlsliberator_commit | "
-            f'select(type == \"string\" and test(\"^[0-9a-f]{{40,64}}$\"))' "
+            "identity=$(jq -er '.image.xlsliberator_commit | "
+            "select(type == \"string\" and test(\"^[0-9a-f]{40,64}$\"))' "
             f"{quoted_identity})",
             f"expected_ref={quoted_ref}",
             'if printf "%s\\n" "$expected_ref" '
