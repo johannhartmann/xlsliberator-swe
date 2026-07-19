@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      XLSLIBERATOR_SOURCE_COMMIT: f4b1d0db2c219b4d58bd4dd7e6f0383fdd2d0ccb
+      XLSLIBERATOR_SOURCE_COMMIT: 205ffa643b8a11ba37cec297b12c3376140a7395
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
       GUI_IMAGE: xlsliberator-libreoffice-gui:26.2.4.2
       APP_IMAGE: xlsliberator-app:showcase
