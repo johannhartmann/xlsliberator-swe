@@ -40,7 +40,7 @@ duration="$2"
 command="$3"
 capture="$(mktemp /tmp/.open-swe-execute.XXXXXX)" || exit 74
 trap 'rm -f "$capture"' EXIT HUP INT TERM
-timeout --signal=KILL --kill-after=5s "$duration" /bin/sh -lc "$command" \
+timeout --signal=KILL --kill-after=5s "$duration" /bin/sh -c "$command" \
   >"$capture" 2>&1
 status=$?
 size="$(wc -c <"$capture")"

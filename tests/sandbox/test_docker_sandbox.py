@@ -161,6 +161,11 @@ def test_execute_passes_untrusted_command_as_docker_argv() -> None:
     assert run.call_args.kwargs["timeout"] == 30
 
 
+def test_execute_script_preserves_pinned_image_path_without_login_shell() -> None:
+    assert '/bin/sh -c "$command"' in docker._EXECUTE_SCRIPT
+    assert '/bin/sh -lc "$command"' not in docker._EXECUTE_SCRIPT
+
+
 def test_execute_preserves_truncation_and_exit_code() -> None:
     backend = docker.DockerSandbox(
         f"xlsliberator-swe-{'a' * 24}",
