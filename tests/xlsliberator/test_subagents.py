@@ -208,7 +208,8 @@ def test_compact_specialists_use_precompiled_minimal_agents() -> None:
     assert all("model" not in spec and "skills" not in spec for spec in specs)
     for call in created:
         assert call["response_format"] is SpecialistResult
-        assert "Do not copy a demo or special-case a fixture." in call["system_prompt"]
+        compact_prompt = " ".join(call["system_prompt"].split())
+        assert "Do not copy a demo or special-case a fixture." in compact_prompt
         middleware = call["middleware"]
         filesystem = next(item for item in middleware if isinstance(item, FilesystemMiddleware))
         enabled_tools = set(filesystem._enabled_tools or ())

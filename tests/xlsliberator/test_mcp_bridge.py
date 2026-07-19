@@ -347,9 +347,10 @@ def test_showcase_bridge_schemas_are_strict_and_keep_generic_values_as_json(
             thread_id="private-thread",
             bridge_root=str(tmp_path),
         )
-        schema = registry.curated[0].tool.tool_call_schema
-
-        assert isinstance(schema, dict)
+        schema_model = registry.curated[0].tool.tool_call_schema
+        schema_factory = getattr(schema_model, "model_json_schema", None)
+        assert callable(schema_factory)
+        schema = cast(dict[str, Any], schema_factory())
         assert schema["additionalProperties"] is False
         assert set(schema["properties"]) == expected
         assert set(schema["required"]) == expected
