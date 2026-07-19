@@ -2,13 +2,12 @@ name: XLSLiberator autonomous showcase
 
 permissions:
   contents: read
-  models: read
 
 on:
   workflow_dispatch:
     inputs:
       provider:
-        description: Model provider for this optional showcase run
+        description: Direct model provider for this manually authorized showcase run
         required: true
         default: openai
         type: choice
@@ -17,7 +16,11 @@ on:
           - anthropic
           - google
           - fireworks
-          - github-models
+      confirm_paid_model_usage:
+        description: I authorize paid model usage for this run
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: xlsliberator-autonomous-showcase
@@ -26,9 +29,9 @@ concurrency:
 jobs:
   migrate:
     name: Public API migration with ${{ inputs.provider }}
+    if: ${{ inputs.confirm_paid_model_usage }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    continue-on-error: ${{ inputs.provider == 'github-models' }}
     env:
       XLSLIBERATOR_SOURCE_COMMIT: 496c0e6db385380bfa853eb59c90c91ea0e2dc83
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
@@ -54,7 +57,6 @@ jobs:
           DIRECT_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DIRECT_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           DIRECT_FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
-          GITHUB_MODELS_API_KEY: ${{ github.token }}
         run: |
           set -euo pipefail
           openai_base_url=
@@ -87,15 +89,6 @@ jobs:
               primary_model=fireworks:accounts/fireworks/models/kimi-k2p7-code
               specialist_model=fireworks:accounts/fireworks/models/kimi-k2p7-code
               reviewer_model=fireworks:accounts/fireworks/models/deepseek-v4-pro
-              ;;
-            github-models)
-              api_key_env=OPENAI_API_KEY
-              api_key="$GITHUB_MODELS_API_KEY"
-              openai_base_url=https://models.github.ai/inference
-              openai_use_responses_api=false
-              primary_model=openai:openai/gpt-4.1
-              specialist_model=openai:openai/gpt-4o-mini
-              reviewer_model=openai:openai/gpt-4.1-nano
               ;;
             *)
               echo "Unsupported showcase provider: $SHOWCASE_PROVIDER" >&2

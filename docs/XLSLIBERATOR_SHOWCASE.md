@@ -7,8 +7,9 @@ episode. It accepts the immutable public `TetrisGameDemo.xlsb` through
 declared role models, and targets only LibreOffice full build `26.2.4.2`.
 
 The workflow supports direct OpenAI, Anthropic, Google Gemini, and Fireworks
-credentials, plus GitHub Models as an explicitly selected compatibility
-option. The trusted server container receives only the selected provider
+credentials. GitHub Models is deliberately unavailable to the workflow. A
+manual dispatch must explicitly authorize paid model usage before the job can
+start. The trusted server container receives only the selected provider
 credential and the Docker socket for sandbox orchestration. Per-thread workbook
 sandboxes are separately created with no network, no credentials, no Docker
 socket, a read-only root filesystem, dropped capabilities, bounded resources,
@@ -28,13 +29,10 @@ content hashes, service logs, image identity, invocation metadata, terminal
 status, and the validator result.
 
 Direct providers require the matching repository secret: `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `FIREWORKS_API_KEY`. GitHub Models
-uses only the workflow-scoped token granted by `models: read`; it does not
-require a long-lived provider key.
+`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `FIREWORKS_API_KEY`. The workflow
+does not request the `models: read` permission and never uses the workflow token
+for model inference.
 
 This manually dispatched showcase is diagnostic evidence, not a required CI
 status check. Direct-provider runs remain strict and fail unless all evidence
-gates pass. A GitHub Models run is explicitly `continue-on-error`, so its quota,
-authentication, or availability limits can never block pull requests, normal
-CI, subsequent work, or a showcase rerun with another provider. A failed
-GitHub Models attempt is not accepted as migration proof.
+gates pass.

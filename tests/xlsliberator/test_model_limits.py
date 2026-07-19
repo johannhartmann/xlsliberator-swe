@@ -26,7 +26,7 @@ from agent.xlsliberator.model_limits import (
 )
 
 
-def test_showcase_model_budget_matches_github_models_limit() -> None:
+def test_showcase_model_budget_stays_within_bounded_context_limit() -> None:
     bounded = bound_showcase_model_kwargs({"max_tokens": 32_768})
 
     assert SHOWCASE_CONTEXT_WINDOW_TOKENS == 8_000

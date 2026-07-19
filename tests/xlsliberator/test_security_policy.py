@@ -221,20 +221,23 @@ def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() ->
     assert workflow.count("--env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1") == 2
     assert workflow.count('--group-add "$(stat -c %g /var/run/docker.sock)"') == 2
     assert '("libreoffice-mcp", 8000), ("corpus-mcp", 8010)' in workflow
+    assert "confirm_paid_model_usage:" in workflow
+    assert "if: ${{ inputs.confirm_paid_model_usage }}" in workflow
     assert "default: openai" in workflow
     assert "          - anthropic" in workflow
     assert "          - google" in workflow
     assert "          - fireworks" in workflow
-    assert "          - github-models" in workflow
-    assert "continue-on-error: ${{ inputs.provider == 'github-models' }}" in workflow
     assert "primary_model=openai:gpt-5.6-sol" in workflow
     assert "primary_model=anthropic:claude-sonnet-5" in workflow
     assert "primary_model=google_genai:gemini-3.5-flash" in workflow
     assert "primary_model=fireworks:accounts/fireworks/models/kimi-k2p7-code" in workflow
-    assert "primary_model=openai:openai/gpt-4.1" in workflow
     assert '--env "${SHOWCASE_API_KEY_ENV}=${SHOWCASE_API_KEY}"' in workflow
     assert "docker logs xlsliberator-showcase-runtime" in workflow
     assert "docker logs xlsliberator-showcase-corpus" in workflow
+    assert "github-models" not in workflow
+    assert "models.github.ai" not in workflow
+    assert "models: read" not in workflow
+    assert "github.token" not in workflow
 
 
 def test_security_adversary_requires_all_twelve_threats_and_derives_verdict() -> None:
