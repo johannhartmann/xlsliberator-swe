@@ -3,15 +3,17 @@
 The manually dispatched `XLSLiberator autonomous showcase` workflow is the
 reproducible public entrypoint for the first complete workbook-migration
 episode. It accepts the immutable public `TetrisGameDemo.xlsb` through
-`POST /api/xlsliberator/migrations`, runs Open SWE with the declared GitHub
-Models role models, and targets only LibreOffice full build `26.2.4.2`.
+`POST /api/xlsliberator/migrations`, runs Open SWE with the selected provider's
+declared role models, and targets only LibreOffice full build `26.2.4.2`.
 
-The trusted server container receives the workflow-scoped GitHub token for
-model inference and the Docker socket for sandbox orchestration. Per-thread
-workbook sandboxes are separately created with no network, no credentials, no
-Docker socket, a read-only root filesystem, dropped capabilities, bounded
-resources, and writable private tmpfs mounts. LibreOffice and PyUNO are invoked
-only through the trusted runtime MCP, whose office jobs are disposable Docker
+The workflow supports direct OpenAI, Anthropic, Google Gemini, and Fireworks
+credentials, plus GitHub Models as an explicitly selected compatibility
+option. The trusted server container receives only the selected provider
+credential and the Docker socket for sandbox orchestration. Per-thread workbook
+sandboxes are separately created with no network, no credentials, no Docker
+socket, a read-only root filesystem, dropped capabilities, bounded resources,
+and writable private tmpfs mounts. LibreOffice and PyUNO are invoked only
+through the trusted runtime MCP, whose office jobs are disposable Docker
 containers.
 
 The workflow fails unless the public API reaches `complete` and exposes the
@@ -25,8 +27,14 @@ operations cross-references. The uploaded workflow artifact also contains
 content hashes, service logs, image identity, invocation metadata, terminal
 status, and the validator result.
 
-GitHub Models access is granted only through the workflow's `models: read`
-permission. No long-lived provider key is required, and the workflow records
-the billed model cost as zero while disclosing that GitHub may apply account
-rate limits. Manual dispatch prevents ordinary pull-request updates from
-consuming the public model quota.
+Direct providers require the matching repository secret: `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `FIREWORKS_API_KEY`. GitHub Models
+uses only the workflow-scoped token granted by `models: read`; it does not
+require a long-lived provider key.
+
+This manually dispatched showcase is diagnostic evidence, not a required CI
+status check. Direct-provider runs remain strict and fail unless all evidence
+gates pass. A GitHub Models run is explicitly `continue-on-error`, so its quota,
+authentication, or availability limits can never block pull requests, normal
+CI, subsequent work, or a showcase rerun with another provider. A failed
+GitHub Models attempt is not accepted as migration proof.

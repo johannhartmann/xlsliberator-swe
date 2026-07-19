@@ -6,6 +6,18 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      provider:
+        description: Model provider for this optional showcase run
+        required: true
+        default: openai
+        type: choice
+        options:
+          - openai
+          - anthropic
+          - google
+          - fireworks
+          - github-models
 
 concurrency:
   group: xlsliberator-autonomous-showcase
@@ -13,9 +25,10 @@ concurrency:
 
 jobs:
   migrate:
-    name: Public API migration with GitHub Models
+    name: Public API migration with ${{ inputs.provider }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    continue-on-error: ${{ inputs.provider == 'github-models' }}
     env:
       XLSLIBERATOR_SOURCE_COMMIT: 496c0e6db385380bfa853eb59c90c91ea0e2dc83
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
@@ -23,11 +36,6 @@ jobs:
       APP_IMAGE: xlsliberator-app:showcase
       SANDBOX_IMAGE: xlsliberator-open-swe-sandbox:showcase
       SERVER_IMAGE: xlsliberator-open-swe-server:showcase
-      OPENAI_BASE_URL: https://models.github.ai/inference
-      OPENAI_USE_RESPONSES_API: "false"
-      SHOWCASE_PRIMARY_MODEL: openai:openai/gpt-4.1
-      SHOWCASE_SPECIALIST_MODEL: openai:openai/gpt-4o-mini
-      SHOWCASE_REVIEWER_MODEL: openai:openai/gpt-4.1-nano
       SHOWCASE_OWNER: public-showcase
     steps:
       - uses: actions/checkout@v7
@@ -38,6 +46,77 @@ jobs:
           repository: johannhartmann/xlsliberator
           ref: ${{ env.XLSLIBERATOR_SOURCE_COMMIT }}
           path: xlsliberator
+
+      - name: Configure selected model provider
+        env:
+          SHOWCASE_PROVIDER: ${{ inputs.provider }}
+          DIRECT_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DIRECT_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DIRECT_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          DIRECT_FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+          GITHUB_MODELS_API_KEY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          openai_base_url=
+          openai_use_responses_api=
+          case "$SHOWCASE_PROVIDER" in
+            openai)
+              api_key_env=OPENAI_API_KEY
+              api_key="$DIRECT_OPENAI_API_KEY"
+              primary_model=openai:gpt-5.6-sol
+              specialist_model=openai:gpt-5.6-terra
+              reviewer_model=openai:gpt-5.6-sol
+              ;;
+            anthropic)
+              api_key_env=ANTHROPIC_API_KEY
+              api_key="$DIRECT_ANTHROPIC_API_KEY"
+              primary_model=anthropic:claude-sonnet-5
+              specialist_model=anthropic:claude-sonnet-5
+              reviewer_model=anthropic:claude-opus-4-8
+              ;;
+            google)
+              api_key_env=GOOGLE_API_KEY
+              api_key="$DIRECT_GOOGLE_API_KEY"
+              primary_model=google_genai:gemini-3.5-flash
+              specialist_model=google_genai:gemini-3.5-flash
+              reviewer_model=google_genai:gemini-3.5-flash
+              ;;
+            fireworks)
+              api_key_env=FIREWORKS_API_KEY
+              api_key="$DIRECT_FIREWORKS_API_KEY"
+              primary_model=fireworks:accounts/fireworks/models/kimi-k2p7-code
+              specialist_model=fireworks:accounts/fireworks/models/kimi-k2p7-code
+              reviewer_model=fireworks:accounts/fireworks/models/deepseek-v4-pro
+              ;;
+            github-models)
+              api_key_env=OPENAI_API_KEY
+              api_key="$GITHUB_MODELS_API_KEY"
+              openai_base_url=https://models.github.ai/inference
+              openai_use_responses_api=false
+              primary_model=openai:openai/gpt-4.1
+              specialist_model=openai:openai/gpt-4o-mini
+              reviewer_model=openai:openai/gpt-4.1-nano
+              ;;
+            *)
+              echo "Unsupported showcase provider: $SHOWCASE_PROVIDER" >&2
+              exit 2
+              ;;
+          esac
+          if [[ -z "$api_key" ]]; then
+            echo "The selected provider has no configured repository credential" >&2
+            exit 2
+          fi
+          echo "::add-mask::$api_key"
+          {
+            echo "SHOWCASE_PROVIDER_LABEL=$SHOWCASE_PROVIDER"
+            echo "SHOWCASE_API_KEY_ENV=$api_key_env"
+            echo "SHOWCASE_API_KEY=$api_key"
+            echo "OPENAI_BASE_URL=$openai_base_url"
+            echo "OPENAI_USE_RESPONSES_API=$openai_use_responses_api"
+            echo "SHOWCASE_PRIMARY_MODEL=$primary_model"
+            echo "SHOWCASE_SPECIALIST_MODEL=$specialist_model"
+            echo "SHOWCASE_REVIEWER_MODEL=$reviewer_model"
+          } >> "$GITHUB_ENV"
 
       - name: Prepare trusted runtime paths
         run: |
@@ -125,8 +204,6 @@ jobs:
             '
 
       - name: Start trusted Docker services
-        env:
-          OPENAI_API_KEY: ${{ github.token }}
         run: |
           set -euo pipefail
           trigger_token="$(openssl rand -hex 32)"
@@ -177,7 +254,7 @@ jobs:
             --env XLSLIBERATOR_CORPUS_MCP_ENDPOINT=http://corpus-mcp:8010/mcp \
             --env XLSLIBERATOR_MCP_ALLOWED_HOSTS=libreoffice-mcp,corpus-mcp \
             --env "XLSLIBERATOR_TRIGGER_TOKEN=${trigger_token}" \
-            --env "OPENAI_API_KEY=${OPENAI_API_KEY}" \
+            --env "${SHOWCASE_API_KEY_ENV}=${SHOWCASE_API_KEY}" \
             --env "OPENAI_BASE_URL=${OPENAI_BASE_URL}" \
             --env "OPENAI_USE_RESPONSES_API=${OPENAI_USE_RESPONSES_API}" \
             --env LANGSMITH_GATEWAY_ENABLED=false \
@@ -238,7 +315,7 @@ jobs:
           test "$source_sha" = \
             da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1
           source_base64="$(base64 -w 0 "$source_path")"
-          requirements='Run the complete first autonomous interactive-game showcase. Spawn workbook-forensics, vba-liberation-engineer, ui-migration-engineer, and test-adversary specialists with isolated evidence. Derive at least two independent direct Python/UNO candidates from the hydrated original workbook, run a fair source-derived tournament, and package only the winner as migration/generated/candidate.zip using the generic content-bound candidate contract. Do not copy the repository demo candidate or add a fixture-specific runtime path. Build the native LibreOffice target with xlsliberator_runtime_build_application_candidate, passing both the immutable source workbook and the generated candidate ZIP. Execute all five canonical public GUI scenarios with that same candidate ZIP, real open/recalculate/interactions/events/save/close/reopen/assertions, source-derived mutation tests, liberation checks, and a replay bundle. Bind candidate, target, scenario, replay, and reviewer digests. Call request_independent_migration_review with repair_id interactive-game. Assemble migration/generated/public-showcase/ against the exact read-only /opt/xlsliberator-showcase/showcase.py schema, including the validated candidate ZIP, and publish the identical validated bytes as migration/generated/public-showcase.zip. Do not fabricate, skip, weaken, or self-certify evidence. Record exact Docker services, LibreOffice 26.2.4.2, the configured GitHub Models role assignments, calls, zero billed workflow cost, runtime, limitations, and all required canonical artifacts. Finish only after a fresh independent APPROVE and strict bundle validation.'
+          requirements='Run the complete first autonomous interactive-game showcase. Spawn workbook-forensics, vba-liberation-engineer, ui-migration-engineer, and test-adversary specialists with isolated evidence. Derive at least two independent direct Python/UNO candidates from the hydrated original workbook, run a fair source-derived tournament, and package only the winner as migration/generated/candidate.zip using the generic content-bound candidate contract. Do not copy the repository demo candidate or add a fixture-specific runtime path. Build the native LibreOffice target with xlsliberator_runtime_build_application_candidate, passing both the immutable source workbook and the generated candidate ZIP. Execute all five canonical public GUI scenarios with that same candidate ZIP, real open/recalculate/interactions/events/save/close/reopen/assertions, source-derived mutation tests, liberation checks, and a replay bundle. Bind candidate, target, scenario, replay, and reviewer digests. Call request_independent_migration_review with repair_id interactive-game. Assemble migration/generated/public-showcase/ against the exact read-only /opt/xlsliberator-showcase/showcase.py schema, including the validated candidate ZIP, and publish the identical validated bytes as migration/generated/public-showcase.zip. Do not fabricate, skip, weaken, or self-certify evidence. Record exact Docker services, LibreOffice 26.2.4.2, the configured provider and role-model assignments, calls, billed model cost, runtime, limitations, and all required canonical artifacts. Finish only after a fresh independent APPROVE and strict bundle validation.'
           jq -n \
             --arg owner "${SHOWCASE_OWNER}" \
             --arg sha "$source_sha" \

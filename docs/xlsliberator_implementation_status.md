@@ -70,14 +70,16 @@ also passed.
 | 20 — repair promotion | COMPLETE; REMOTE MAIN CI GREEN AT `28a80f5`; OPEN-SWE FORMAT REPAIR INCLUDED IN `e2430a23` | exact eight-stage state machine, immutable layer classification, pinned LO identities, corpus/build-farm boundaries, validator and independent-review gates |
 | 21 — execution hardening | COMPLETE; CURRENT CI GREEN AT `4b8dfbda` | networkless read-only sandbox, server-owned typed grants, role-authorized MCP, twelve-probe security adversary, escape smoke, Docker Bandit and dependency audit; Agent CI [29684882696](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882696) and Docker sandbox [29684882689](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882689) |
 | 22 — LangSmith evaluations | COMPLETE IMPLEMENTATION; CURRENT CI GREEN | migration-only trace metadata, exactly fourteen deterministic evaluators, five-state public/hidden reports, format/feature/configuration grouping, fail-closed release decision, and nightly approved-configuration benchmark workflow; live nightly execution still requires repository benchmark endpoint/token secrets |
-| 23 — autonomous showcase | BLOCKED BY EXTERNAL PUBLIC-MODEL QUOTA | [run 29684882715](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882715) passed exact image builds, hostile-sandbox hydration, trusted-service startup, and API trigger, then the first GitHub Models call and every bounded retry returned HTTP 429; no candidate, independent `APPROVE`, or human-use proof exists |
+| 23 — autonomous showcase | PROOF PENDING; SINGLE-PROVIDER GATE REMOVED | [run 29684882715](https://github.com/johannhartmann/xlsliberator-swe/actions/runs/29684882715) passed exact image builds, hostile-sandbox hydration, trusted-service startup, and API trigger, then GitHub Models returned HTTP 429. The workflow now supports direct OpenAI, Anthropic, Google, Fireworks, or optional non-gating GitHub Models; no candidate, independent `APPROVE`, or human-use proof exists yet |
 
 ## Next action
 
-Manually dispatch Prompt 23 after the public GitHub Models daily quota resets,
-or configure an authorized provider credential for the same generic workflow. Completion
-requires the real candidate, target evidence, independent `APPROVE`, and
-human-use replay. Never replace that proof with a copied demo, fixture-specific
-converter, workbook/hash/sheet/control dispatch, weakened oracle, or fabricated
-artifact. Concrete episode identity is confined to the separate showcase
-prompt/schema/reviewer; the reusable migration runtime remains source-agnostic.
+Configure an authorized direct-provider credential and manually dispatch Prompt
+23 with that provider. GitHub Models remains available as an optional
+non-gating run, but its quota is not a prerequisite for further execution.
+Completion requires the real candidate, target evidence, independent `APPROVE`,
+and human-use replay. Never replace that proof with a copied demo,
+fixture-specific converter, workbook/hash/sheet/control dispatch, weakened
+oracle, or fabricated artifact. Concrete episode identity is confined to the
+separate showcase prompt/schema/reviewer; the reusable migration runtime remains
+source-agnostic.

@@ -1,4 +1,4 @@
-"""Bounded model configuration for the public autonomous showcase."""
+"""Bounded model configuration for the provider-independent autonomous showcase."""
 
 from __future__ import annotations
 
@@ -207,7 +207,7 @@ def is_binary_artifact_path(value: object) -> bool:
 
 
 class ShowcaseContextBudgetMiddleware(AgentMiddleware[Any, Any, Any]):
-    """Keep the constrained public provider below its joint request budget."""
+    """Keep showcase calls below the smallest supported provider request budget."""
 
     async def awrap_model_call(
         self,
@@ -218,7 +218,7 @@ class ShowcaseContextBudgetMiddleware(AgentMiddleware[Any, Any, Any]):
 
 
 class _ShowcaseProviderCoordinator:
-    """Serialize calls and space their start times for a constrained endpoint."""
+    """Serialize calls and space their start times across showcase roles."""
 
     def __init__(
         self,
@@ -355,7 +355,7 @@ class BinaryArtifactReadGuardMiddleware(AgentMiddleware[Any, Any, Any]):
 
 
 def showcase_model_profile() -> ModelProfile:
-    """Describe the constrained GitHub Models endpoint used by the showcase."""
+    """Describe the portable minimum capabilities required by the showcase."""
 
     return {
         "max_input_tokens": SHOWCASE_MAX_INPUT_TOKENS,
@@ -368,7 +368,7 @@ def showcase_model_profile() -> ModelProfile:
 
 
 def bound_showcase_model_kwargs(kwargs: ModelKwargs) -> ModelKwargs:
-    """Apply the endpoint's joint input and output budget."""
+    """Apply the showcase's provider-independent input and output budget."""
 
     bounded: ModelKwargs = kwargs.copy()
     bounded["max_tokens"] = SHOWCASE_MAX_OUTPUT_TOKENS
