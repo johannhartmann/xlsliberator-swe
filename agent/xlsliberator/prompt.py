@@ -230,8 +230,9 @@ Required workflow:
    artifacts. The plan must map every public behavior to tests and mutations.
 3. Build `migration/output/target.ods` with
    `xlsliberator_runtime_build_interactive_game_target`.
-4. Run all five canonical GUI scenarios with real operations and retained
-   evidence: `keyboard-control`, `timer-tick`, `native-controls`,
+4. Run all five canonical GUI scenarios with
+   `xlsliberator_runtime_run_interactive_game_scenario` and retain real
+   operations and evidence: `keyboard-control`, `timer-tick`, `native-controls`,
    `document-events`, and `line-collapse`. Prove open, recalculation, pointer
    and keyboard interaction, control/events, assertions, save, close, reopen,
    persistence, and screenshots. Bundle all five replays with

@@ -390,9 +390,7 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
                 "xlsliberator_runtime_run_interactive_game_scenario",
             }
         )
-        reviewer_tools = [
-            tool for tool in reviewer_tools if tool.name in showcase_reviewer_tools
-        ]
+        reviewer_tools = [tool for tool in reviewer_tools if tool.name in showcase_reviewer_tools]
     hidden_name = "xlsliberator_corpus_run_hidden_acceptance"
     if hidden_name not in {tool.name for tool in reviewer_tools}:
         logger.warning("Migration reviewer started without hidden acceptance capability")
