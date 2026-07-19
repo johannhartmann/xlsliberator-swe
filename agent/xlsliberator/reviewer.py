@@ -47,7 +47,11 @@ from ..utils.tracing import traced_graph_factory
 from .integrations.mcp import load_migration_mcp_registry
 from .integrations.mcp_bridge import bridge_migration_mcp_registry
 from .migrations import TASK_KIND
-from .model_limits import bound_showcase_model_kwargs, showcase_system_prompt
+from .model_limits import (
+    ShowcaseProviderRateLimitMiddleware,
+    bound_showcase_model_kwargs,
+    showcase_system_prompt,
+)
 from .settings import XLSLiberatorSettings
 
 logger = logging.getLogger(__name__)
@@ -453,6 +457,11 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
                 SanitizeToolInputsMiddleware(),
                 ModelCallLimitMiddleware(run_limit=MODEL_CALL_RECURSION_LIMIT, exit_behavior="end"),
                 ToolErrorMiddleware(),
+                *(
+                    [ShowcaseProviderRateLimitMiddleware()]
+                    if settings.showcase_mode
+                    else []
+                ),
                 SanitizeFireworksMessagesMiddleware(),
                 SanitizeThinkingBlocksMiddleware(),
             ],

@@ -12,6 +12,7 @@ from langchain_core.language_models import BaseChatModel
 from agent.xlsliberator.model_limits import (
     BinaryArtifactReadGuardMiddleware,
     ShowcaseContextBudgetMiddleware,
+    ShowcaseProviderRateLimitMiddleware,
 )
 from agent.xlsliberator.skills import SPECIALIST_SKILL_NAMES, SPECIALIST_SKILLS_ROOT
 from agent.xlsliberator.subagents import (
@@ -224,6 +225,7 @@ def test_compact_specialists_use_precompiled_minimal_agents() -> None:
             "edit_file",
         }
         assert any(isinstance(item, BinaryArtifactReadGuardMiddleware) for item in middleware)
+        assert any(isinstance(item, ShowcaseProviderRateLimitMiddleware) for item in middleware)
         assert any(isinstance(item, ShowcaseContextBudgetMiddleware) for item in middleware)
         assert filesystem._custom_system_prompt == ""
         assert "execute" not in enabled_tools

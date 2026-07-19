@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import weakref
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Final
 
@@ -29,6 +31,7 @@ SHOWCASE_RECENT_TOOL_RESULT_CHARS: Final[int] = 1_800
 SHOWCASE_OLD_TOOL_RESULT_CHARS: Final[int] = 240
 SHOWCASE_MESSAGE_CHARS: Final[int] = 1_200
 SHOWCASE_TOOL_ARGUMENT_CHARS: Final[int] = 240
+SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS: Final[float] = 4.25
 SHOWCASE_TASK_DESCRIPTION: Final[str] = (
     "Delegate one independent workbook-migration task. Available specialists:\n{available_agents}"
 )
@@ -208,6 +211,65 @@ class ShowcaseContextBudgetMiddleware(AgentMiddleware[Any, Any, Any]):
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse:
         return await handler(request.override(messages=compact_showcase_messages(request.messages)))
+
+
+class _ShowcaseProviderCoordinator:
+    """Serialize calls and space their start times for a constrained endpoint."""
+
+    def __init__(self, min_interval_seconds: float) -> None:
+        self._min_interval_seconds = min_interval_seconds
+        self._lock = asyncio.Lock()
+        self._next_start = 0.0
+
+    async def call(
+        self,
+        handler: Callable[[], Awaitable[ModelResponse]],
+    ) -> ModelResponse:
+        async with self._lock:
+            loop = asyncio.get_running_loop()
+            delay = self._next_start - loop.time()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            self._next_start = loop.time() + self._min_interval_seconds
+            return await handler()
+
+
+_SHOWCASE_PROVIDER_COORDINATORS: weakref.WeakKeyDictionary[
+    asyncio.AbstractEventLoop,
+    dict[tuple[str, float], _ShowcaseProviderCoordinator],
+] = weakref.WeakKeyDictionary()
+
+
+class ShowcaseProviderRateLimitMiddleware(AgentMiddleware[Any, Any, Any]):
+    """Share one bounded provider lane across lead, specialists, and reviewer."""
+
+    def __init__(
+        self,
+        *,
+        coordinator_key: str = "public-showcase",
+        min_interval_seconds: float = SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS,
+    ) -> None:
+        if min_interval_seconds < 0:
+            raise ValueError("min_interval_seconds must be non-negative")
+        self._coordinator_key = coordinator_key
+        self._min_interval_seconds = min_interval_seconds
+
+    def _coordinator(self) -> _ShowcaseProviderCoordinator:
+        loop = asyncio.get_running_loop()
+        coordinators = _SHOWCASE_PROVIDER_COORDINATORS.setdefault(loop, {})
+        key = (self._coordinator_key, self._min_interval_seconds)
+        coordinator = coordinators.get(key)
+        if coordinator is None:
+            coordinator = _ShowcaseProviderCoordinator(self._min_interval_seconds)
+            coordinators[key] = coordinator
+        return coordinator
+
+    async def awrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
+    ) -> ModelResponse:
+        return await self._coordinator().call(lambda: handler(request))
 
 
 class BinaryArtifactReadGuardMiddleware(AgentMiddleware[Any, Any, Any]):

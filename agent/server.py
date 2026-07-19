@@ -170,6 +170,7 @@ from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.model_limits import (
     BinaryArtifactReadGuardMiddleware,
     ShowcaseContextBudgetMiddleware,
+    ShowcaseProviderRateLimitMiddleware,
     bound_showcase_model_kwargs,
     register_showcase_harness_profile,
     showcase_system_prompt,
@@ -1268,6 +1269,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                 *(
                     [
                         BinaryArtifactReadGuardMiddleware(),
+                        ShowcaseProviderRateLimitMiddleware(),
                         ShowcaseContextBudgetMiddleware(),
                     ]
                     if compact_showcase

@@ -1,7 +1,12 @@
 """Public-showcase model budget tests."""
 
+import asyncio
+import uuid
+from typing import cast
 from unittest.mock import patch
 
+import pytest
+from langchain.agents.middleware.types import ModelRequest, ModelResponse
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 
 from agent.xlsliberator.model_limits import (
@@ -10,7 +15,9 @@ from agent.xlsliberator.model_limits import (
     SHOWCASE_MAX_INPUT_TOKENS,
     SHOWCASE_MAX_OUTPUT_TOKENS,
     SHOWCASE_OLD_TOOL_RESULT_CHARS,
+    SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS,
     SHOWCASE_TASK_DESCRIPTION,
+    ShowcaseProviderRateLimitMiddleware,
     bound_showcase_model_kwargs,
     compact_showcase_messages,
     is_binary_artifact_path,
@@ -124,3 +131,47 @@ def test_binary_artifact_paths_require_runtime_inspection() -> None:
     assert is_binary_artifact_path("/workspace/source/book.XLSB")
     assert is_binary_artifact_path("/workspace/output/replay.webm")
     assert not is_binary_artifact_path("/workspace/source/vba/Game.bas")
+
+
+def test_showcase_provider_interval_stays_below_public_request_rate() -> None:
+    assert SHOWCASE_PROVIDER_MIN_INTERVAL_SECONDS >= 60 / 15
+
+
+@pytest.mark.asyncio
+async def test_showcase_provider_lane_is_shared_and_serial() -> None:
+    key = f"test-{uuid.uuid4()}"
+    first = ShowcaseProviderRateLimitMiddleware(
+        coordinator_key=key,
+        min_interval_seconds=0,
+    )
+    second = ShowcaseProviderRateLimitMiddleware(
+        coordinator_key=key,
+        min_interval_seconds=0,
+    )
+    first_entered = asyncio.Event()
+    release_first = asyncio.Event()
+    second_entered = asyncio.Event()
+    request = cast(ModelRequest, object())
+    first_response = cast(ModelResponse, object())
+    second_response = cast(ModelResponse, object())
+
+    async def first_handler(_request: ModelRequest) -> ModelResponse:
+        first_entered.set()
+        await release_first.wait()
+        return first_response
+
+    async def second_handler(_request: ModelRequest) -> ModelResponse:
+        second_entered.set()
+        return second_response
+
+    first_call = asyncio.create_task(first.awrap_model_call(request, first_handler))
+    await first_entered.wait()
+    second_call = asyncio.create_task(second.awrap_model_call(request, second_handler))
+    await asyncio.sleep(0)
+
+    assert not second_entered.is_set()
+    release_first.set()
+    first_result, second_result = await asyncio.gather(first_call, second_call)
+    assert first_result is first_response
+    assert second_result is second_response
+    assert second_entered.is_set()

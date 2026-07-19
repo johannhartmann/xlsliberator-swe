@@ -22,7 +22,11 @@ from langchain_core.tools import BaseTool
 from langsmith.run_helpers import get_tracing_context, tracing_context
 from pydantic import BaseModel, ConfigDict, Field
 
-from .model_limits import BinaryArtifactReadGuardMiddleware, ShowcaseContextBudgetMiddleware
+from .model_limits import (
+    BinaryArtifactReadGuardMiddleware,
+    ShowcaseContextBudgetMiddleware,
+    ShowcaseProviderRateLimitMiddleware,
+)
 from .skills import specialist_skill_source
 
 WORKSPACE = "/workspace"
@@ -516,6 +520,7 @@ def build_migration_subagents(
                     SpecialistTraceMiddleware(profile),
                     filesystem_middleware,
                     BinaryArtifactReadGuardMiddleware(),
+                    ShowcaseProviderRateLimitMiddleware(),
                     ShowcaseContextBudgetMiddleware(),
                 ],
                 name=profile.name,
