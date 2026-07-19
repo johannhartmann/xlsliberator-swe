@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langgraph.graph.state import RunnableConfig
 
-from agent.server import get_agent
+from agent.server import _resolve_agent_github_token, get_agent
 from agent.xlsliberator.integrations.mcp import MigrationMCPRegistry
 
 
@@ -33,6 +33,36 @@ def _base_config() -> RunnableConfig:
         },
         "metadata": {},
     }
+
+
+@pytest.mark.asyncio
+async def test_migration_agent_does_not_resolve_github_credentials() -> None:
+    resolver = AsyncMock(side_effect=AssertionError("migration requested GitHub credentials"))
+
+    with patch("agent.server.resolve_github_token", resolver):
+        token = await _resolve_agent_github_token(
+            _base_config(),
+            "thread-migration",
+            {"runtime": {"status": "AVAILABLE"}},
+        )
+
+    assert token is None
+    resolver.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_repository_agent_keeps_github_authentication() -> None:
+    resolver = AsyncMock(return_value=("ghp_user", None))
+
+    with patch("agent.server.resolve_github_token", resolver):
+        token = await _resolve_agent_github_token(
+            _base_config(),
+            "thread-repository",
+            None,
+        )
+
+    assert token == "ghp_user"
+    resolver.assert_awaited_once_with(_base_config(), "thread-repository")
 
 
 async def _capture_create_deep_agent_kwargs(

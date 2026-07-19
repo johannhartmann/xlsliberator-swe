@@ -714,6 +714,24 @@ def _make_model_or_defer(
         return make_deferred_error_model(e, model_id=model_id)
 
 
+async def _resolve_agent_github_token(
+    config: RunnableConfig,
+    thread_id: str,
+    migration_mcp_metadata: Mapping[str, Mapping[str, object]] | None,
+) -> str | None:
+    """Resolve user GitHub credentials only for repository-backed agent runs.
+
+    Workbook migrations operate on server-hydrated public inputs inside the
+    network-isolated Docker sandbox. They neither need nor should receive a
+    user's GitHub OAuth token. The non-migration path retains the existing
+    authentication requirement.
+    """
+    if migration_mcp_metadata is not None:
+        return None
+    github_token, _expires_at = await resolve_github_token(config, thread_id)
+    return github_token
+
+
 class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
     def __init__(
         self,
@@ -760,7 +778,11 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         }
 
     async def _prepare(self, state: PrepareRunState, runtime: Runtime) -> dict[str, Any]:  # noqa: ARG002
-        github_token, _expires_at = await resolve_github_token(self._config, self._thread_id)
+        github_token = await _resolve_agent_github_token(
+            self._config,
+            self._thread_id,
+            self._migration_mcp_metadata,
+        )
         configurable = (self._config or {}).get("configurable") or {}
         prompt_default_repo = await _resolve_prompt_default_repo(configurable)
         triggering_user_identity_task = asyncio.create_task(
