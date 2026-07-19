@@ -143,6 +143,7 @@ RUN UV_PROJECT_ENVIRONMENT=/opt/open-swe-venv \
 COPY --from=xlsliberator pyproject.toml README.md /opt/xlsliberator-source/
 COPY --from=xlsliberator src /opt/xlsliberator-source/src
 COPY --from=xlsliberator rules /opt/xlsliberator-source/rules
+COPY --from=xlsliberator skills /opt/xlsliberator-source/skills
 COPY docker/xlsliberator-sandbox/xlsliberator-env/pyproject.toml \
      docker/xlsliberator-sandbox/xlsliberator-env/uv.lock \
      /opt/xlsliberator-environment/

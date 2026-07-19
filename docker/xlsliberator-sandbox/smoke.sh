@@ -39,6 +39,11 @@ test -s /tmp/xlsliberator-smoke.png
 xlsliberator-sandbox-identity | jq -e \
   '.status == "PASSED" and .image.libreoffice_build == "26.2.4.2"' >/dev/null
 test -s /workspace/.xlsliberator/sandbox-identity.json
+test -f /opt/xlsliberator-source/skills/workbook-forensics/SKILL.md
+test -f /opt/xlsliberator-source/skills/vba-to-python-uno/SKILL.md
+test -f /opt/xlsliberator-source/skills/userform-to-uno/SKILL.md
+test -z "$(find /opt/xlsliberator-source/skills -type l -print -quit)"
+test "$(du -sk /opt/xlsliberator-source/skills | cut -f1)" -le 4096
 
 /opt/xlsliberator-venv/bin/python /opt/xlsliberator-sandbox/mcp_smoke.py
 

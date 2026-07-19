@@ -2,20 +2,26 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from deepagents.backends.protocol import (
     BackendProtocol,
+    ExecuteResponse,
     FileDownloadResponse,
     LsResult,
+    SandboxBackendProtocol,
 )
 
 from agent.xlsliberator.settings import XLSLiberatorSettings
 from agent.xlsliberator.skills import (
     BUILTIN_SKILLS_ROOT,
+    EMBEDDED_PROJECT_SKILLS_ROOT,
     MAX_SKILL_FILE_BYTES,
     PROJECT_SKILLS_ROOT,
+    SANDBOX_IDENTITY_PATH,
     SkillValidationError,
+    _materialize_project_skills,
     lint_skill_root,
     load_validated_skills,
     migration_skill_sources,
@@ -190,3 +196,29 @@ def test_lint_skill_root_reports_invalid_frontmatter(tmp_path: Path) -> None:
 
     assert len(errors) == 1
     assert "unterminated YAML frontmatter" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_project_skills_materialize_from_pinned_networkless_image() -> None:
+    identity = "a" * 40
+    backend = MagicMock(spec=SandboxBackendProtocol)
+    backend.aexecute = AsyncMock(
+        return_value=ExecuteResponse(
+            output=f"trusted_skills_sha={identity}\n",
+            exit_code=0,
+        )
+    )
+    settings = XLSLiberatorSettings.from_env({"XLSLIBERATOR_SKILLS_REPO_REF": identity})
+
+    actual = await _materialize_project_skills(
+        cast(SandboxBackendProtocol, backend),
+        settings,
+    )
+
+    assert actual == identity
+    command = backend.aexecute.await_args.args[0]
+    assert EMBEDDED_PROJECT_SKILLS_ROOT in command
+    assert SANDBOX_IDENTITY_PATH in command
+    assert "git fetch" not in command
+    assert "https://" not in command
+    assert 'test "$identity" = "$expected_ref"' in command

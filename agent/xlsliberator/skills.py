@@ -35,6 +35,8 @@ BUILTIN_SKILLS_ROOT = f"{DEFAULT_SKILLS_ROOT}/builtin"
 PROJECT_SKILLS_ROOT = f"{DEFAULT_SKILLS_ROOT}/project"
 SPECIALIST_SKILLS_ROOT = f"{DEFAULT_SKILLS_ROOT}/specialists"
 BUILTIN_SKILLS_PACKAGE = Path(__file__).resolve().parent.parent / "skills" / "xlsliberator"
+EMBEDDED_PROJECT_SKILLS_ROOT = "/opt/xlsliberator-source/skills"
+SANDBOX_IDENTITY_PATH = "/etc/xlsliberator-sandbox/identity.json"
 SPECIALIST_SKILL_NAMES: dict[str, tuple[str, ...]] = {
     "workbook-forensics": ("workbook-forensics", "secure-workbook-execution"),
     "formula-engineer": ("formula-migration", "migration-test-design"),
@@ -279,33 +281,38 @@ async def _materialize_project_skills(
     settings: XLSLiberatorSettings,
 ) -> str:
     repository = f"{settings.skills_repo_owner}/{settings.skills_repo_name}"
-    repository_url = f"https://github.com/{repository}.git"
-    repository_dir = f"{DEFAULT_SKILLS_ROOT}/project-repository"
-    quoted_repository_dir = shlex.quote(repository_dir)
+    quoted_source = shlex.quote(EMBEDDED_PROJECT_SKILLS_ROOT)
+    quoted_identity = shlex.quote(SANDBOX_IDENTITY_PATH)
     quoted_destination = shlex.quote(PROJECT_SKILLS_ROOT)
-    quoted_url = shlex.quote(repository_url)
     quoted_ref = shlex.quote(settings.skills_repo_ref)
     command = "\n".join(
         [
             "set -eu",
-            f"rm -rf {quoted_repository_dir} {quoted_destination}",
-            f"mkdir -p {quoted_repository_dir} {quoted_destination}",
-            f"git -C {quoted_repository_dir} init --quiet",
-            f"git -C {quoted_repository_dir} remote add origin {quoted_url}",
-            f"git -C {quoted_repository_dir} fetch --quiet --depth=1 origin -- {quoted_ref}",
-            f"git -C {quoted_repository_dir} archive FETCH_HEAD skills/ "
-            f"| tar -x --strip-components=1 -C {quoted_destination}",
+            f"test -d {quoted_source}",
+            f"test -r {quoted_identity}",
+            f"identity=$(jq -er '.image.xlsliberator_commit | "
+            f'select(type == \"string\" and test(\"^[0-9a-f]{{40,64}}$\"))' "
+            f"{quoted_identity})",
+            f"expected_ref={quoted_ref}",
+            'if printf "%s\\n" "$expected_ref" '
+            "| grep -Eq '^[0-9a-f]{40,64}$'; then",
+            '  test "$identity" = "$expected_ref"',
+            "fi",
+            f"rm -rf {quoted_destination}",
+            f"mkdir -p {quoted_destination}",
+            f"cp -R {quoted_source}/. {quoted_destination}/",
             f"if find {quoted_destination} -type l -print -quit | grep -q .; then exit 43; fi",
             f"if find {quoted_destination} -type f -size +1M -print -quit | grep -q .; "
             "then exit 44; fi",
             f'test "$(du -sk {quoted_destination} | cut -f1)" -le 4096',
-            f'printf "trusted_skills_sha=%s\\n" '
-            f'"$(git -C {quoted_repository_dir} rev-parse FETCH_HEAD)"',
+            'printf "trusted_skills_sha=%s\\n" "$identity"',
         ]
     )
     result = await backend.aexecute(command, timeout=MATERIALIZATION_TIMEOUT_SECONDS)
     if result.exit_code not in (0, None):
-        raise RuntimeError(f"trusted skill materialization failed for {repository}")
+        detail = result.output.strip()[-500:]
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"trusted skill materialization failed for {repository}{suffix}")
     identity = next(
         (
             line.removeprefix("trusted_skills_sha=")
