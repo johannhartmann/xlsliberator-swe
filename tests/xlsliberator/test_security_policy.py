@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -172,6 +173,17 @@ def test_sandbox_environment_drops_provider_service_and_github_secrets() -> None
         "TMPDIR": "/tmp",
         "XLSLIBERATOR_UNTRUSTED_WORKBOOK": "1",
     }
+
+
+def test_sandbox_image_reuses_preexisting_numeric_uid_and_gid() -> None:
+    dockerfile = (
+        Path(__file__).parents[2] / "docker/xlsliberator-sandbox/Dockerfile"
+    ).read_text(encoding="utf-8")
+
+    assert "if ! getent group 10001" in dockerfile
+    assert "if ! getent passwd 10001" in dockerfile
+    assert "getent group sandbox" not in dockerfile
+    assert "getent passwd sandbox" not in dockerfile
 
 
 def test_security_adversary_requires_all_twelve_threats_and_derives_verdict() -> None:

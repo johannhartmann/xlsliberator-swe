@@ -206,8 +206,8 @@ RUN chmod 0555 \
     && test "$(dpkg-query -W -f='${Version}' libobasis26.2-python-script-provider)" = "${LIBREOFFICE_BUILD}-2" \
     && PYTHONPATH=/opt/libreoffice26.2/program \
        /opt/libreoffice26.2/program/python -c 'import pyuno, uno; assert uno.__file__.startswith("/opt/libreoffice26.2/program/"); assert pyuno.__file__.startswith("/opt/libreoffice26.2/program/")' \
-    && if ! getent group sandbox >/dev/null; then groupadd --gid 10001 sandbox; fi \
-    && if ! getent passwd sandbox >/dev/null; then \
+    && if ! getent group 10001 >/dev/null; then groupadd --gid 10001 sandbox; fi \
+    && if ! getent passwd 10001 >/dev/null; then \
          useradd --uid 10001 --gid 10001 --home-dir /home/sandbox --shell /bin/bash sandbox; \
        fi \
     && chown -R 10001:10001 /workspace /home/sandbox /tmp/home \
