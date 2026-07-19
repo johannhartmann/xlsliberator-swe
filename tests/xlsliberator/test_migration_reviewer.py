@@ -128,6 +128,21 @@ def test_reviewer_prompt_never_authorizes_hidden_definition_export() -> None:
     assert "aggregate counts" in REVIEWER_SYSTEM_PROMPT
 
 
+def test_compact_showcase_reviewer_keeps_hidden_and_liberation_gates() -> None:
+    prompt = reviewer_prompt(
+        reviewer_model="openai:openai/gpt-4.1",
+        artifact_sha256="d" * 64,
+        showcase_mode=True,
+    )
+
+    assert len(prompt) < 2_500
+    assert "xlsliberator_corpus_run_hidden_acceptance" in prompt
+    assert "no VBA" in prompt
+    assert "read-only" in prompt
+    assert "APPROVE only" in prompt
+    assert "reviewed_artifact_sha256: `" + ("d" * 64) + "`" in prompt
+
+
 @pytest.mark.asyncio
 async def test_independent_review_rejects_malformed_repair_id_before_context_access() -> None:
     result = await request_independent_migration_review("../hidden")

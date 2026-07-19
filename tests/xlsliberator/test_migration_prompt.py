@@ -14,8 +14,11 @@ from agent.xlsliberator.prompt import (
     GOLDEN_MIGRATION_PATHS,
     MIGRATION_LEAD_PROMPT,
     MIGRATION_LEAD_STAGES,
+    SHOWCASE_MCP_TOOL_NAMES,
+    SHOWCASE_SPECIALIST_NAMES,
     MigrationFeature,
     prompt_for_task,
+    showcase_prompt,
     trajectory_for,
 )
 
@@ -48,6 +51,46 @@ def test_lead_prompt_contains_ordered_fourteen_stage_loop() -> None:
     assert "Treat outputs as private" in MIGRATION_LEAD_PROMPT
     assert "opaque hidden-corpus repair ID is `interactive-game`" in MIGRATION_LEAD_PROMPT
     assert "migration/generated/public-showcase.zip" in MIGRATION_LEAD_PROMPT
+
+
+def test_showcase_prompt_is_bounded_and_preserves_every_acceptance_gate() -> None:
+    rendered = showcase_prompt("/workspace")
+
+    assert "/workspace" in rendered
+    assert len(rendered) < 6_000
+    assert set(SHOWCASE_SPECIALIST_NAMES) == {
+        "workbook-forensics",
+        "vba-liberation-engineer",
+        "ui-migration-engineer",
+        "test-adversary",
+    }
+    assert SHOWCASE_MCP_TOOL_NAMES == {
+        "xlsliberator_runtime_build_interactive_game_target",
+        "xlsliberator_runtime_run_interactive_game_scenario",
+        "xlsliberator_runtime_bundle_interactive_game_replays",
+    }
+    for specialist in SHOWCASE_SPECIALIST_NAMES:
+        assert specialist in rendered
+    for tool in SHOWCASE_MCP_TOOL_NAMES:
+        assert tool in rendered
+    for scenario in (
+        "keyboard-control",
+        "timer-tick",
+        "native-controls",
+        "document-events",
+        "line-collapse",
+    ):
+        assert scenario in rendered
+    for requirement in (
+        "LibreOffice full build `26.2.4.2`",
+        "source-derived mutations",
+        "save, close, reopen",
+        "public-showcase.zip",
+        "request_independent_migration_review",
+        "APPROVE",
+        "XLSLIBERATOR_STATUS: DELIVERABLE",
+    ):
+        assert requirement in rendered
 
 
 @pytest.mark.parametrize(

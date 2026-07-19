@@ -18,6 +18,7 @@ from agent.xlsliberator.settings import (
     DEFAULT_SANDBOX_IMAGE_VERSION,
     DEFAULT_SANDBOX_MEMORY_BYTES,
     DEFAULT_SANDBOX_PIDS_LIMIT,
+    DEFAULT_SHOWCASE_MODE,
     DEFAULT_SKILLS_REPO_NAME,
     DEFAULT_SKILLS_REPO_OWNER,
     DEFAULT_SKILLS_REPO_REF,
@@ -54,6 +55,7 @@ def test_settings_have_deterministic_fork_defaults() -> None:
     assert settings.skills_repo_ref == DEFAULT_SKILLS_REPO_REF
     assert settings.team_skill_sources == ()
     assert settings.user_skill_sources == ()
+    assert settings.showcase_mode is DEFAULT_SHOWCASE_MODE
 
 
 def test_settings_accept_deployment_overrides() -> None:
@@ -85,6 +87,7 @@ def test_settings_accept_deployment_overrides() -> None:
                 "/workspace/.xlsliberator-skills/team/one,/workspace/.xlsliberator-skills/team/two"
             ),
             "XLSLIBERATOR_USER_SKILL_SOURCES": ("/workspace/.xlsliberator-skills/user/one"),
+            "XLSLIBERATOR_SHOWCASE_MODE": "true",
         }
     )
 
@@ -115,6 +118,7 @@ def test_settings_accept_deployment_overrides() -> None:
         "/workspace/.xlsliberator-skills/team/two/",
     )
     assert settings.user_skill_sources == ("/workspace/.xlsliberator-skills/user/one/",)
+    assert settings.showcase_mode is True
 
 
 def test_environment_defaults_do_not_replace_explicit_values() -> None:
@@ -175,3 +179,8 @@ def test_skill_sources_must_remain_below_trusted_root() -> None:
         XLSLiberatorSettings.from_env(
             {"XLSLIBERATOR_TEAM_SKILL_SOURCES": "/workspace/untrusted/skills"}
         )
+
+
+def test_showcase_mode_rejects_ambiguous_boolean() -> None:
+    with pytest.raises(ValueError, match="XLSLIBERATOR_SHOWCASE_MODE must be a boolean"):
+        XLSLiberatorSettings.from_env({"XLSLIBERATOR_SHOWCASE_MODE": "sometimes"})

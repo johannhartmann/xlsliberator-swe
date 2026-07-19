@@ -354,8 +354,10 @@ class MigrationSkillsMiddleware(SkillsMiddleware):
         *,
         backend: Any,
         settings: XLSLiberatorSettings,
+        expose_metadata: bool = True,
     ) -> None:
         self._xlsliberator_settings = settings
+        self._expose_metadata = expose_metadata
         super().__init__(
             backend=backend,
             sources=migration_skill_sources(settings),
@@ -387,4 +389,4 @@ class MigrationSkillsMiddleware(SkillsMiddleware):
             len(skills),
             identity,
         )
-        return SkillsStateUpdate(skills_metadata=skills)
+        return SkillsStateUpdate(skills_metadata=skills if self._expose_metadata else [])

@@ -192,3 +192,36 @@ async def test_migration_uses_explicit_primary_and_specialist_models(
     assert calls[0][1]["max_tokens"] > 0
     assert "reasoning" not in calls[0][1]
     assert "reasoning" not in calls[1][1]
+
+
+@pytest.mark.asyncio
+async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XLSLIBERATOR_SHOWCASE_MODE", "true")
+    monkeypatch.setenv("XLSLIBERATOR_PRIMARY_MODEL", "openai:openai/gpt-4.1")
+    monkeypatch.setenv("XLSLIBERATOR_SPECIALIST_MODEL", "openai:openai/gpt-4.1")
+    config = _base_config()
+    configurable = config.setdefault("configurable", {})
+    assert isinstance(configurable, dict)
+    configurable["task_kind"] = "workbook_migration"
+
+    captured = await _capture_create_deep_agent_kwargs(config)
+
+    tools = captured["tools"]
+    subagents = captured["subagents"]
+    calls = captured["model_calls"]
+    assert isinstance(tools, list)
+    assert isinstance(subagents, list)
+    assert isinstance(calls, list)
+    assert [subagent["name"] for subagent in subagents] == [
+        "workbook-forensics",
+        "vba-liberation-engineer",
+        "ui-migration-engineer",
+        "test-adversary",
+    ]
+    assert {getattr(tool, "name", getattr(tool, "__name__", "")) for tool in tools} == {
+        "request_independent_migration_review"
+    }
+    assert calls[0][1]["max_tokens"] == 4000
+    assert calls[1][1]["max_tokens"] == 4000

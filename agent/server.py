@@ -165,7 +165,12 @@ from .xlsliberator.middleware import (
     migration_middleware_stack,
 )
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
-from .xlsliberator.prompt import prompt_for_task
+from .xlsliberator.prompt import (
+    SHOWCASE_MCP_TOOL_NAMES,
+    SHOWCASE_SPECIALIST_NAMES,
+    prompt_for_task,
+    showcase_prompt,
+)
 from .xlsliberator.reviewer import request_independent_migration_review
 from .xlsliberator.settings import XLSLiberatorSettings
 from .xlsliberator.skills import MigrationSkillsMiddleware
@@ -749,6 +754,7 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         plan_mode: bool,
         corridor_enabled: bool,
         migration_mcp_metadata: Mapping[str, Mapping[str, object]] | None,
+        compact_showcase: bool,
     ) -> None:
         self._thread_id = thread_id
         self._config = config
@@ -763,6 +769,7 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         self._plan_mode = plan_mode
         self._corridor_enabled = corridor_enabled
         self._migration_mcp_metadata = migration_mcp_metadata
+        self._compact_showcase = compact_showcase
 
     def _prepare_config_fingerprint(self) -> Any:
         configurable = (self._config or {}).get("configurable") or {}
@@ -775,6 +782,7 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
             "model": self._model_id,
             "effort": self._effort,
             "migration_mcp": self._migration_mcp_metadata,
+            "compact_showcase": self._compact_showcase,
         }
 
     async def _prepare(self, state: PrepareRunState, runtime: Runtime) -> dict[str, Any]:  # noqa: ARG002
@@ -785,21 +793,29 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
         )
         configurable = (self._config or {}).get("configurable") or {}
         prompt_default_repo = await _resolve_prompt_default_repo(configurable)
-        triggering_user_identity_task = asyncio.create_task(
-            asyncio.to_thread(
-                resolve_triggering_user_identity, as_json_object(self._config), github_token
-            )
-        )
         sandbox_task = asyncio.create_task(
             ensure_sandbox_for_thread(self._thread_id, repo=prompt_default_repo)
         )
-        triggering_user_identity, sandbox_backend = await asyncio.gather(
-            triggering_user_identity_task,
-            sandbox_task,
-        )
+        if self._compact_showcase:
+            triggering_user_identity = None
+            sandbox_backend = await sandbox_task
+        else:
+            triggering_user_identity_task = asyncio.create_task(
+                asyncio.to_thread(
+                    resolve_triggering_user_identity, as_json_object(self._config), github_token
+                )
+            )
+            triggering_user_identity, sandbox_backend = await asyncio.gather(
+                triggering_user_identity_task,
+                sandbox_task,
+            )
         del github_token
         work_dir = await aresolve_sandbox_work_dir(sandbox_backend)
-        repo_custom_instructions = await _resolve_repo_custom_instructions(prompt_default_repo)
+        repo_custom_instructions = (
+            None
+            if self._compact_showcase
+            else await _resolve_repo_custom_instructions(prompt_default_repo)
+        )
 
         try:
             thread_metadata: dict[str, object] = {
@@ -828,25 +844,29 @@ class PrepareAgentRunMiddleware(BasePrepareRunMiddleware):
                 "Failed to record agent usage for thread %s", self._thread_id, exc_info=True
             )
 
-        base_system_prompt = construct_system_prompt(
-            working_dir=work_dir,
-            linear_project_id=self._linear_project_id,
-            linear_issue_number=self._linear_issue_number,
-            triggering_user_identity=triggering_user_identity,
-            create_prs=self._create_prs,
-            default_repo=prompt_default_repo,
-            plan_mode=self._plan_mode,
-            plan_url=dashboard_plan_url(self._thread_id),
-            repo_custom_instructions=repo_custom_instructions,
-            thread_url=dashboard_thread_url(self._thread_id),
-            corridor_enabled=self._corridor_enabled,
-        )
-        return {
-            "work_dir": work_dir,
-            "rendered_system_prompt": prompt_for_task(
+        if self._compact_showcase:
+            rendered_system_prompt = showcase_prompt(work_dir)
+        else:
+            base_system_prompt = construct_system_prompt(
+                working_dir=work_dir,
+                linear_project_id=self._linear_project_id,
+                linear_issue_number=self._linear_issue_number,
+                triggering_user_identity=triggering_user_identity,
+                create_prs=self._create_prs,
+                default_repo=prompt_default_repo,
+                plan_mode=self._plan_mode,
+                plan_url=dashboard_plan_url(self._thread_id),
+                repo_custom_instructions=repo_custom_instructions,
+                thread_url=dashboard_thread_url(self._thread_id),
+                corridor_enabled=self._corridor_enabled,
+            )
+            rendered_system_prompt = prompt_for_task(
                 base_system_prompt,
                 task_kind=configurable.get("task_kind"),
-            ),
+            )
+        return {
+            "work_dir": work_dir,
+            "rendered_system_prompt": rendered_system_prompt,
         }
 
 
@@ -866,6 +886,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
 
     is_migration = configurable.get("task_kind") == WORKBOOK_MIGRATION_TASK_KIND
     migration_settings = XLSLiberatorSettings.from_env() if is_migration else None
+    compact_showcase = bool(migration_settings and migration_settings.showcase_mode)
     profile_login = resolve_github_login(as_json_object(config))
     # Team/profile settings are accepted stale for a short TTL so graph factories
     # stay off the critical path during worker load and retry storms.
@@ -971,15 +992,16 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         subagent_model_id, subagent_effort, fable_enabled=fable_enabled
     )
 
+    max_tokens = 4000 if compact_showcase else DEFAULT_LLM_MAX_TOKENS
     model_kwargs = provider_model_kwargs(
         model_id,
         profile_effort,
-        max_tokens=DEFAULT_LLM_MAX_TOKENS,
+        max_tokens=max_tokens,
     )
     subagent_model_kwargs = provider_model_kwargs(
         subagent_model_id,
         subagent_effort,
-        max_tokens=DEFAULT_LLM_MAX_TOKENS,
+        max_tokens=max_tokens,
     )
 
     fallback_model_id = os.environ.get("LLM_FALLBACK_MODEL_ID") or fallback_model_id_for(model_id)
@@ -1013,11 +1035,16 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         PlanModeMiddleware(excluded=PLAN_MODE_EXCLUDED_TOOLS, initial=plan_mode)
     ]
 
-    observability_tools = await _load_observability_tools(
-        await _observability_authorized(config, profile_login)
-    )
-    corridor_tools = await _load_corridor_mcp_tools()
-    browser_tools = load_browser_tools()
+    if compact_showcase:
+        observability_tools: list[Any] = []
+        corridor_tools: list[Any] = []
+        browser_tools: list[Any] = []
+    else:
+        observability_tools = await _load_observability_tools(
+            await _observability_authorized(config, profile_login)
+        )
+        corridor_tools = await _load_corridor_mcp_tools()
+        browser_tools = load_browser_tools()
     migration_skills_middleware: list[Any] = []
     migration_evaluation_middleware: list[Any] = []
     migration_guard_middleware: list[AgentMiddleware[Any, Any, Any]] = []
@@ -1037,6 +1064,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
             MigrationSkillsMiddleware(
                 backend=backend_factory,
                 settings=migration_settings,
+                expose_metadata=not compact_showcase,
             )
         )
         migration_guard_middleware = migration_middleware_stack(
@@ -1047,7 +1075,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
 
     currents_tools: list[Any] = []
     notion_tools: list[Any] = []
-    if profile_login:
+    if profile_login and not compact_showcase:
         currents_tools, notion_tools = await asyncio.gather(
             _cached_tool_loader(
                 f"tools:currents:{profile_login}:{id(load_currents_tools)}",
@@ -1084,6 +1112,13 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         if migration_mcp_registry is not None
         else []
     )
+    if compact_showcase:
+        migration_implementation_tools = [
+            tool for tool in migration_implementation_tools if tool.name in SHOWCASE_MCP_TOOL_NAMES
+        ]
+        migration_lead_tools = [
+            tool for tool in migration_lead_tools if tool.name in SHOWCASE_MCP_TOOL_NAMES
+        ]
     migration_review_tools = [request_independent_migration_review] if is_migration else []
     migration_subagents = subagents_for_task_kind(
         configurable.get("task_kind"),
@@ -1091,10 +1126,16 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         tools=migration_implementation_tools,
         migration_task_kind=WORKBOOK_MIGRATION_TASK_KIND,
     )
-    return create_deep_agent(
-        model=main_model,
-        system_prompt="",
-        tools=[
+    if compact_showcase:
+        migration_subagents = [
+            subagent
+            for subagent in migration_subagents
+            if subagent["name"] in SHOWCASE_SPECIALIST_NAMES
+        ]
+    general_tools = (
+        []
+        if compact_showcase
+        else [
             http_request,
             fetch_url,
             web_search,
@@ -1120,12 +1161,26 @@ async def get_agent(config: RunnableConfig) -> Pregel:
             *observability_tools,
             *currents_tools,
             *notion_tools,
+        ]
+    )
+    generic_subagents = (
+        []
+        if compact_showcase
+        else [
+            _general_purpose_subagent(subagent_model),
+            *([_browser_subagent(subagent_model, browser_tools)] if browser_tools else []),
+        ]
+    )
+    return create_deep_agent(
+        model=main_model,
+        system_prompt="",
+        tools=[
+            *general_tools,
             *migration_lead_tools,
             *migration_review_tools,
         ],
         subagents=[
-            _general_purpose_subagent(subagent_model),
-            *([_browser_subagent(subagent_model, browser_tools)] if browser_tools else []),
+            *generic_subagents,
             *migration_subagents,
         ],
         backend=backend_factory,
@@ -1150,6 +1205,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
                         if migration_mcp_registry is not None
                         else None
                     ),
+                    compact_showcase=compact_showcase,
                 ),
                 WorkbookAttachmentMiddleware(configurable),
                 *migration_evaluation_middleware,

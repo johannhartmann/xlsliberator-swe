@@ -28,8 +28,11 @@ DEFAULT_SKILLS_REPO_OWNER = DEFAULT_REPO_OWNER
 DEFAULT_SKILLS_REPO_NAME = DEFAULT_REPO_NAME
 DEFAULT_SKILLS_REPO_REF = "main"
 DEFAULT_SKILLS_ROOT = "/workspace/.xlsliberator-skills"
+DEFAULT_SHOWCASE_MODE = False
 
 _REPOSITORY_COMPONENT = re.compile(r"^[A-Za-z0-9_.-]+$")
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 
 
 def _value(env: Mapping[str, str], name: str, default: str) -> str:
@@ -55,6 +58,18 @@ def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be positive")
     return value
+
+
+def _boolean(env: Mapping[str, str], name: str, default: bool) -> bool:
+    raw_value = env.get(name)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in _TRUE_VALUES:
+        return True
+    if normalized in _FALSE_VALUES:
+        return False
+    raise ValueError(f"{name} must be a boolean")
 
 
 def _repository_component(env: Mapping[str, str], name: str, default: str) -> str:
@@ -105,6 +120,7 @@ class XLSLiberatorSettings:
     skills_repo_ref: str
     team_skill_sources: tuple[str, ...]
     user_skill_sources: tuple[str, ...]
+    showcase_mode: bool
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> XLSLiberatorSettings:
@@ -222,6 +238,11 @@ class XLSLiberatorSettings:
             user_skill_sources=_trusted_skill_paths(
                 source,
                 "XLSLIBERATOR_USER_SKILL_SOURCES",
+            ),
+            showcase_mode=_boolean(
+                source,
+                "XLSLIBERATOR_SHOWCASE_MODE",
+                DEFAULT_SHOWCASE_MODE,
             ),
         )
 
