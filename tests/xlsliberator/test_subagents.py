@@ -64,9 +64,7 @@ def test_specialist_catalog_has_required_roles_and_isolated_skill_views() -> Non
 
     for spec in specs:
         declarative = cast(dict[str, Any], spec)
-        assert declarative.get("skills") == [
-            f"{SPECIALIST_SKILLS_ROOT}/{declarative['name']}/"
-        ]
+        assert declarative.get("skills") == [f"{SPECIALIST_SKILLS_ROOT}/{declarative['name']}/"]
         assert "must not certify or approve" in declarative["system_prompt"]
         assert "self_certified=false" in declarative["system_prompt"]
         assert declarative.get("response_format") is SpecialistResult
