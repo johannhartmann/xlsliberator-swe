@@ -165,6 +165,10 @@ from .xlsliberator.middleware import (
     WorkbookAttachmentMiddleware,
     migration_middleware_stack,
 )
+from .xlsliberator.model_limits import (
+    bound_showcase_model_kwargs,
+    showcase_system_prompt,
+)
 from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.prompt import (
     SHOWCASE_MCP_TOOL_NAMES,
@@ -180,7 +184,6 @@ from .xlsliberator.subagents import subagents_for_task_kind
 client = get_client()
 
 DEFAULT_TOOL_LOADER_TIMEOUT_SECONDS = 5.0
-SHOWCASE_MAX_OUTPUT_TOKENS = 1_500
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
@@ -994,17 +997,19 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         subagent_model_id, subagent_effort, fable_enabled=fable_enabled
     )
 
-    max_tokens = SHOWCASE_MAX_OUTPUT_TOKENS if compact_showcase else DEFAULT_LLM_MAX_TOKENS
     model_kwargs = provider_model_kwargs(
         model_id,
         profile_effort,
-        max_tokens=max_tokens,
+        max_tokens=DEFAULT_LLM_MAX_TOKENS,
     )
     subagent_model_kwargs = provider_model_kwargs(
         subagent_model_id,
         subagent_effort,
-        max_tokens=max_tokens,
+        max_tokens=DEFAULT_LLM_MAX_TOKENS,
     )
+    if compact_showcase:
+        model_kwargs = bound_showcase_model_kwargs(model_kwargs)
+        subagent_model_kwargs = bound_showcase_model_kwargs(subagent_model_kwargs)
 
     fallback_model_id = os.environ.get("LLM_FALLBACK_MODEL_ID") or fallback_model_id_for(model_id)
     fallback_middleware: list[Any] = []
@@ -1176,7 +1181,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     )
     return create_deep_agent(
         model=main_model,
-        system_prompt="",
+        system_prompt=showcase_system_prompt() if compact_showcase else "",
         tools=[
             *general_tools,
             *migration_lead_tools,

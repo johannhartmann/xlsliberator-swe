@@ -46,13 +46,13 @@ from ..utils.model import DEFAULT_LLM_REASONING, make_model, provider_model_kwar
 from ..utils.tracing import traced_graph_factory
 from .integrations.mcp import load_migration_mcp_registry
 from .integrations.mcp_bridge import bridge_migration_mcp_registry
+from .model_limits import bound_showcase_model_kwargs, showcase_system_prompt
 from .migrations import TASK_KIND
 from .settings import XLSLiberatorSettings
 
 logger = logging.getLogger(__name__)
 
 MIGRATION_REVIEW_TRACING_PROJECT = "xlsliberator-migration-review"
-SHOWCASE_REVIEW_MAX_OUTPUT_TOKENS = 1_500
 REVIEW_RESULT_PATH = "migration/reviewer/result.json"
 TARGET_PATH = "migration/output/target.ods"
 _REPAIR_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,99}$")
@@ -405,11 +405,11 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
     model_kwargs = provider_model_kwargs(
         settings.reviewer_model,
         reviewer_effort,
-        max_tokens=(
-            SHOWCASE_REVIEW_MAX_OUTPUT_TOKENS if settings.showcase_mode else DEFAULT_LLM_MAX_TOKENS
-        ),
+        max_tokens=DEFAULT_LLM_MAX_TOKENS,
         openai_reasoning_default=DEFAULT_LLM_REASONING,
     )
+    if settings.showcase_mode:
+        model_kwargs = bound_showcase_model_kwargs(model_kwargs)
     model = make_model(
         settings.reviewer_model,
         use_gateway=await get_effective_gateway_enabled(),
@@ -418,10 +418,19 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
     artifact_sha256 = await _artifact_digest(backend)
     return create_deep_agent(
         model=model,
-        system_prompt=reviewer_prompt(
-            reviewer_model=settings.reviewer_model,
-            artifact_sha256=artifact_sha256,
-            showcase_mode=settings.showcase_mode,
+        system_prompt=(
+            showcase_system_prompt(
+                reviewer_prompt(
+                    reviewer_model=settings.reviewer_model,
+                    artifact_sha256=artifact_sha256,
+                    showcase_mode=True,
+                )
+            )
+            if settings.showcase_mode
+            else reviewer_prompt(
+                reviewer_model=settings.reviewer_model,
+                artifact_sha256=artifact_sha256,
+            )
         ),
         tools=[*reviewer_tools, submit_migration_review_result],
         backend=backend,

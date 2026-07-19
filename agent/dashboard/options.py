@@ -79,7 +79,7 @@ SUPPORTED_MODELS: list[ModelOption] = [
         "default_effort": "none",
         "supports_images": True,
         "supports_reasoning": False,
-        "context_window": 1_048_576,
+        "context_window": 8_000,
     },
     {
         "id": "google_genai:gemini-3.5-flash",

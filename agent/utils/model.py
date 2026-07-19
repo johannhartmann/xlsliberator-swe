@@ -4,6 +4,7 @@ from typing import Any, Literal, TypedDict, Unpack, cast
 from urllib.parse import urlsplit
 
 from langchain.chat_models import init_chat_model
+from langchain_core.language_models import ModelProfile
 
 from ..dashboard.options import DEFAULT_MODEL_ID, model_supports_reasoning
 from .gateway import gateway_env_default, gateway_overrides
@@ -87,6 +88,7 @@ class ModelKwargs(TypedDict, total=False):
     include: list[str] | None
     output_version: Literal["responses/v1"] | None
     model_kwargs: dict[str, object] | None
+    profile: ModelProfile | None
 
 
 _ANTHROPIC_EFFORTS: set[AnthropicEffort] = {"low", "medium", "high", "xhigh", "max"}
