@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from deepagents.backends import CompositeBackend
 from deepagents.backends.protocol import BackendProtocol
 from deepagents.backends.state import StateBackend
-from deepagents.middleware.filesystem import FilesystemMiddleware, FilesystemPermission
+from deepagents.middleware.filesystem import (
+    FilesystemMiddleware,
+    FilesystemPermission,
+    FsToolName,
+)
 from deepagents.middleware.subagents import SubAgent
 from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.language_models import BaseChatModel
@@ -21,7 +25,7 @@ from .skills import specialist_skill_source
 WORKSPACE = "/workspace"
 MIGRATION_ROOT = f"{WORKSPACE}/migration"
 SPECIALIST_ARTIFACT_ROOT = f"{WORKSPACE}/.deepagents/specialists"
-_SPECIALIST_FILESYSTEM_TOOLS = [
+_SPECIALIST_FILESYSTEM_TOOLS: list[FsToolName] = [
     "ls",
     "read_file",
     "write_file",
@@ -403,16 +407,19 @@ def _permissions(profile: SpecialistProfile) -> list[FilesystemPermission]:
 def _specialist_filesystem_middleware(
     profile: SpecialistProfile,
     backend: BackendProtocol,
-) -> FilesystemMiddleware:
+) -> AgentMiddleware[Any, Any, Any]:
     filesystem_backend = CompositeBackend(
         default=backend,
         routes={},
         artifacts_root=_artifact_root(profile),
     )
-    return FilesystemMiddleware(
-        backend=filesystem_backend,
-        tools=_SPECIALIST_FILESYSTEM_TOOLS,
-        _permissions=_permissions(profile),
+    return cast(
+        AgentMiddleware[Any, Any, Any],
+        FilesystemMiddleware(
+            backend=filesystem_backend,
+            tools=_SPECIALIST_FILESYSTEM_TOOLS,
+            _permissions=_permissions(profile),
+        ),
     )
 
 

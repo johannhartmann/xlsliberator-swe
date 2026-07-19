@@ -146,9 +146,7 @@ def test_specialist_filesystem_cannot_execute_or_bypass_path_permissions() -> No
         assert not isinstance(filesystem.backend.default, SandboxBackendProtocol)
         assert filesystem._enabled_tools is not None
         assert "execute" not in filesystem._enabled_tools
-        assert filesystem.backend.artifacts_root.startswith(
-            "/workspace/.deepagents/specialists/"
-        )
+        assert filesystem.backend.artifacts_root.startswith("/workspace/.deepagents/specialists/")
 
 
 def test_domain_subagents_are_absent_for_ordinary_tasks() -> None:
