@@ -165,11 +165,11 @@ from .xlsliberator.middleware import (
     WorkbookAttachmentMiddleware,
     migration_middleware_stack,
 )
+from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.model_limits import (
     bound_showcase_model_kwargs,
     showcase_system_prompt,
 )
-from .xlsliberator.migrations import TASK_KIND as WORKBOOK_MIGRATION_TASK_KIND
 from .xlsliberator.prompt import (
     SHOWCASE_MCP_TOOL_NAMES,
     SHOWCASE_SPECIALIST_NAMES,

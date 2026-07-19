@@ -58,10 +58,8 @@ def test_supported_openai_models_include_gpt_5_5_and_gpt_5_6() -> None:
 def test_github_models_gpt_4_1_has_non_reasoning_profile() -> None:
     assert model_default_effort("openai:openai/gpt-4.1") == "none"
     assert model_supports_reasoning("openai:openai/gpt-4.1") is False
-    option = next(
-        option for option in SUPPORTED_MODELS if option["id"] == "openai:openai/gpt-4.1"
-    )
-    assert option["context_window"] == 8_000
+    option = next(option for option in SUPPORTED_MODELS if option["id"] == "openai:openai/gpt-4.1")
+    assert option.get("context_window") == 8_000
 
 
 @pytest.mark.parametrize("model_id", ["unknown:model", "no-colon", "", None, 123])

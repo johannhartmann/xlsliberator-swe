@@ -14,8 +14,8 @@ def test_showcase_model_budget_matches_github_models_limit() -> None:
 
     assert SHOWCASE_CONTEXT_WINDOW_TOKENS == 8_000
     assert SHOWCASE_MAX_INPUT_TOKENS + SHOWCASE_MAX_OUTPUT_TOKENS == 8_000
-    assert bounded["max_tokens"] == SHOWCASE_MAX_OUTPUT_TOKENS
-    assert bounded["profile"] == {
+    assert bounded.get("max_tokens") == SHOWCASE_MAX_OUTPUT_TOKENS
+    assert bounded.get("profile") == {
         "max_input_tokens": SHOWCASE_MAX_INPUT_TOKENS,
         "max_output_tokens": SHOWCASE_MAX_OUTPUT_TOKENS,
         "text_inputs": True,
