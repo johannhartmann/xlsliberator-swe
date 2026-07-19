@@ -13,12 +13,10 @@ import shutil
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, cast
+from typing import Any
 
 from deepagents.backends.protocol import SandboxBackendProtocol
 from langchain_core.tools import BaseTool, StructuredTool
-from pydantic import BaseModel
-
 from .mcp import CuratedTool, MCPServiceHealth, MigrationMCPRegistry
 
 _SHOWCASE_TOOLS = frozenset(
@@ -130,7 +128,14 @@ def _bridged_tool(
         thread_id=thread_id,
         root=root,
     )
-    input_schema = cast(type[BaseModel], item.tool.get_input_schema())
+    # MCP adapters expose their authoritative input schema as a JSON-schema
+    # dict. Calling ``get_input_schema()`` on that dict asks LangChain to model
+    # the tool's entire Runnable input union and creates an unrelated
+    # ``root.anyOf`` schema. Strict OpenAI-compatible providers reject that
+    # wrapper before any tool can run, so preserve the MCP schema verbatim.
+    input_schema = item.tool.args_schema
+    if input_schema is None:
+        input_schema = item.tool.get_input_schema()
     return StructuredTool.from_function(
         coroutine=handler,
         name=item.tool.name,

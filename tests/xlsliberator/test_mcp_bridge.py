@@ -163,6 +163,44 @@ def test_path_bearing_tools_are_hidden_without_configured_bridge() -> None:
     assert runtime_health.reason == "path-bearing tools withheld: secure bridge not configured"
 
 
+def test_bridge_preserves_mcp_json_schema_without_root_wrapper(tmp_path: Path) -> None:
+    async def build(source_path: str, output_path: str) -> dict[str, Any]:
+        return _success(source_path=source_path, output_path=output_path)
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "source_path": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+        "required": ["source_path", "output_path"],
+        "additionalProperties": False,
+    }
+    tool = StructuredTool(
+        name="build_interactive_game_target",
+        description="Build target.",
+        args_schema=schema,
+        coroutine=build,
+    )
+
+    registry = bridge_migration_mcp_registry(
+        _registry("build_interactive_game_target", tool),
+        backend=lambda: cast(SandboxBackendProtocol, _Backend({})),
+        thread_id="private-thread",
+        bridge_root=str(tmp_path),
+    )
+
+    bridged = registry.curated[0].tool
+    tool_call_schema = bridged.tool_call_schema
+    assert bridged.args_schema == schema
+    assert tool_call_schema == {
+        **schema,
+        "description": "Build target.",
+    }
+    assert isinstance(tool_call_schema, dict)
+    assert "root" not in tool_call_schema["properties"]
+
+
 @pytest.mark.asyncio
 async def test_failed_open_removes_private_document_copy(tmp_path: Path) -> None:
     async def open_document(session_id: str, document_path: str) -> dict[str, Any]:

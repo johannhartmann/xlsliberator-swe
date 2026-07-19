@@ -34,7 +34,7 @@ import asyncio
 warnings.filterwarnings("ignore", message=".*Pydantic V1.*", category=UserWarning)
 
 from deepagents import create_deep_agent
-from deepagents.backends import LangSmithSandbox
+from deepagents.backends import CompositeBackend, LangSmithSandbox
 from deepagents.backends.protocol import SandboxBackendProtocol
 from deepagents.middleware.subagents import GENERAL_PURPOSE_SUBAGENT, SubAgent
 from langchain.agents.middleware import ModelCallLimitMiddleware, ToolRetryMiddleware
@@ -594,6 +594,8 @@ delegated.
 - Return a concise summary of what you did and the data you extracted; include \
 the session replay URL if one was returned."""
 
+DEEPAGENT_ARTIFACT_ROOT = "/workspace/.deepagents"
+
 
 def _browser_subagent(model: BaseChatModel, tools: list[Any]) -> SubAgent:
     return {
@@ -916,6 +918,18 @@ async def get_agent(config: RunnableConfig) -> Pregel:
     def backend_factory(_runtime: object, _thread_id: str = thread_id) -> SandboxBackendProtocol:
         return _get_cached_sandbox_backend(_thread_id, reconnect=reconnect_backend)
 
+    # DeepAgents derives its conversation-history and large-tool-result paths
+    # from CompositeBackend.artifacts_root at graph construction time. A raw
+    # sandbox backend defaults those paths to filesystem root, which is
+    # deliberately read-only in the hardened migration container. Keep all
+    # agent-owned artifacts in the private writable workspace while retaining
+    # the executable sandbox as the default backend.
+    agent_backend = CompositeBackend(
+        default=backend_factory(None),
+        routes={},
+        artifacts_root=DEEPAGENT_ARTIFACT_ROOT,
+    )
+
     (model_id, profile_effort), (subagent_model_id, subagent_effort) = team_defaults
     logger.info("Using team default agent model: model=%s effort=%s", model_id, profile_effort)
 
@@ -1191,7 +1205,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
             *generic_subagents,
             *migration_subagents,
         ],
-        backend=backend_factory,
+        backend=agent_backend,
         middleware=cast(
             list[AgentMiddleware[Any, Any, Any]],
             [

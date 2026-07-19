@@ -1,10 +1,10 @@
 """Assembly contract for the main agent's context-management + middleware wiring.
 
-Locks in that `get_agent` hands a sandbox `backend` to `create_deep_agent` (which
-is what makes deepagents auto-wire `FilesystemMiddleware` tool-result eviction and
-`SummarizationMiddleware` history offloading), and that the redundant custom
-`RepairOrphanedToolCallsMiddleware` is no longer added explicitly — the built-in
-`PatchToolCallsMiddleware` that `create_deep_agent` adds covers it.
+Locks in that `get_agent` hands an executable composite sandbox backend with a
+writable artifact root to `create_deep_agent`. This makes DeepAgents auto-wire
+filesystem eviction and summarization without trying to write below the
+container's read-only root. The built-in `PatchToolCallsMiddleware` covers
+orphaned tool-call repair.
 """
 
 from __future__ import annotations
@@ -12,9 +12,11 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from deepagents.backends import CompositeBackend
+from deepagents.backends.protocol import SandboxBackendProtocol
 from langgraph.graph.state import RunnableConfig
 
-from agent.server import _resolve_agent_github_token, get_agent
+from agent.server import DEEPAGENT_ARTIFACT_ROOT, _resolve_agent_github_token, get_agent
 from agent.xlsliberator.integrations.mcp import MigrationMCPRegistry
 
 
@@ -120,11 +122,13 @@ async def _capture_create_deep_agent_kwargs(
 
 
 @pytest.mark.asyncio
-async def test_agent_is_built_with_a_backend_for_eviction_and_summarization() -> None:
+async def test_agent_uses_writable_sandbox_artifact_root_for_context_management() -> None:
     captured = await _capture_create_deep_agent_kwargs()
-    # The backend is what enables deepagents' auto-wired FilesystemMiddleware
-    # eviction + SummarizationMiddleware offloading.
-    assert callable(captured["backend"])
+    backend = captured["backend"]
+    assert isinstance(backend, CompositeBackend)
+    assert backend.artifacts_root == DEEPAGENT_ARTIFACT_ROOT
+    assert backend.routes == {}
+    assert isinstance(backend.default, SandboxBackendProtocol)
 
 
 @pytest.mark.asyncio
