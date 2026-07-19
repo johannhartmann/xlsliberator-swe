@@ -347,10 +347,8 @@ def test_showcase_bridge_schemas_are_strict_and_keep_generic_values_as_json(
             thread_id="private-thread",
             bridge_root=str(tmp_path),
         )
-        schema_model = registry.curated[0].tool.tool_call_schema
-        schema_factory = getattr(schema_model, "model_json_schema", None)
-        assert callable(schema_factory)
-        schema = cast(dict[str, Any], schema_factory())
+        schema = registry.curated[0].tool.tool_call_schema
+        assert isinstance(schema, dict)
         assert schema["additionalProperties"] is False
         assert set(schema["properties"]) == expected
         assert set(schema["required"]) == expected
@@ -387,6 +385,18 @@ async def test_scenario_bridge_rejects_malformed_generic_json_before_download(
                 "scenario_id": "source-derived-scenario",
                 "actions_json": "[",
                 "adapter_config_json": "{}",
+            }
+        )
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        await registry.curated[0].tool.ainvoke(
+            {
+                "target_path": "/workspace/migration/output/target.ods",
+                "candidate_path": "/workspace/migration/generated/candidate.zip",
+                "evidence_path": "/workspace/migration/evidence/scenario.zip",
+                "scenario_id": "source-derived-scenario",
+                "actions_json": "[]",
+                "adapter_config_json": "{}",
+                "fixture_override": "forbidden",
             }
         )
 

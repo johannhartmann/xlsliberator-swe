@@ -168,9 +168,9 @@ def _bridged_tool(
     # wrapper before any tool can run. Preserve safe MCP schemas; encode the two
     # open-ended nested payloads as validated JSON text at the provider boundary.
     if item.original_name == "run_application_scenario":
-        input_schema = _ScenarioBridgeInput
+        input_schema = _ScenarioBridgeInput.model_json_schema()
     elif item.original_name == "bundle_application_replays":
-        input_schema = _ReplayBridgeInput
+        input_schema = _ReplayBridgeInput.model_json_schema()
     else:
         input_schema = item.tool.args_schema
         if input_schema is None:
@@ -193,6 +193,10 @@ def _handler_for(
     original_name = item.original_name
 
     async def handler(**arguments: Any) -> dict[str, Any]:
+        if original_name == "run_application_scenario":
+            arguments = _ScenarioBridgeInput.model_validate(arguments).model_dump()
+        elif original_name == "bundle_application_replays":
+            arguments = _ReplayBridgeInput.model_validate(arguments).model_dump()
         sandbox = backend()
         if original_name == "build_application_candidate":
             return await _bridge_build(item.tool, sandbox, thread_id, root, arguments)
