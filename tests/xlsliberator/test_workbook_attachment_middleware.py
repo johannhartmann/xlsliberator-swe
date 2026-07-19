@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from langchain.agents.middleware.types import ModelRequest, ModelResponse
+from langchain.agents.middleware.types import AgentState, ModelRequest, ModelResponse
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, SystemMessage
 
@@ -55,13 +55,16 @@ async def test_compact_context_omits_duplicated_requirements() -> None:
         model=cast(BaseChatModel, object()),
         messages=[],
         system_message=SystemMessage(content="lead contract"),
-        state={
-            "messages": [],
-            "workbook_migration_context": {
-                "summary": {"sheet_count": 2},
-                "requirements": "duplicated fixed showcase contract",
+        state=cast(
+            AgentState,
+            {
+                "messages": [],
+                "workbook_migration_context": {
+                    "summary": {"sheet_count": 2},
+                    "requirements": "duplicated fixed showcase contract",
+                },
             },
-        },
+        ),
     )
 
     await middleware.awrap_model_call(request, handler)

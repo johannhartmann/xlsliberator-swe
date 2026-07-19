@@ -406,9 +406,7 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
         settings.reviewer_model,
         reviewer_effort,
         max_tokens=(
-            SHOWCASE_REVIEW_MAX_OUTPUT_TOKENS
-            if settings.showcase_mode
-            else DEFAULT_LLM_MAX_TOKENS
+            SHOWCASE_REVIEW_MAX_OUTPUT_TOKENS if settings.showcase_mode else DEFAULT_LLM_MAX_TOKENS
         ),
         openai_reasoning_default=DEFAULT_LLM_REASONING,
     )
