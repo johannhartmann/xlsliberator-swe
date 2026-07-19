@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      XLSLIBERATOR_SOURCE_COMMIT: 205ffa643b8a11ba37cec297b12c3376140a7395
+      XLSLIBERATOR_SOURCE_COMMIT: 17c8e4e715ef30569cf81830229d4c9ba8ac9903
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
       GUI_IMAGE: xlsliberator-libreoffice-gui:26.2.4.2
       APP_IMAGE: xlsliberator-app:showcase
@@ -48,10 +48,11 @@ jobs:
           hidden="${RUNNER_TEMP}/xlsliberator-hidden"
           output="${GITHUB_WORKSPACE}/showcase-output"
           mkdir -p "$bridge" "$runtime" "$hidden" "$output"
-          chmod 0700 "$bridge" "$runtime" "$hidden"
           printf '%s\n' \
             '{"status":"passed","sanitized_findings":[]}' \
             > "$hidden/interactive-game.json"
+          sudo chown -R 10001:10001 "$bridge" "$runtime" "$hidden"
+          chmod 0700 "$bridge" "$runtime" "$hidden"
           chmod 0600 "$hidden/interactive-game.json"
           {
             echo "SHOWCASE_BRIDGE=$bridge"
@@ -128,6 +129,7 @@ jobs:
             --network "${SHOWCASE_NETWORK}" \
             --network-alias corpus-mcp \
             --volume "${SHOWCASE_HIDDEN}:${SHOWCASE_HIDDEN}:ro" \
+            --env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1 \
             --env XLSLIBERATOR_HIDDEN_CORPUS_REVIEWER_ENABLED=true \
             --env "XLSLIBERATOR_HIDDEN_CORPUS_RESULTS_ROOT=${SHOWCASE_HIDDEN}" \
             "${APP_IMAGE}" \
@@ -136,6 +138,7 @@ jobs:
             --name xlsliberator-showcase-server \
             --network "${SHOWCASE_NETWORK}" \
             --publish 127.0.0.1:2024:2024 \
+            --group-add "$(stat -c %g /var/run/docker.sock)" \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --volume "${SHOWCASE_BRIDGE}:${SHOWCASE_BRIDGE}" \
             --env SANDBOX_TYPE=docker \
@@ -167,7 +170,25 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:2024/health >/dev/null; then
+            runtime_running="$(
+              docker inspect --format '{{.State.Running}}' xlsliberator-showcase-runtime
+            )"
+            corpus_running="$(
+              docker inspect --format '{{.State.Running}}' xlsliberator-showcase-corpus
+            )"
+            server_running="$(
+              docker inspect --format '{{.State.Running}}' xlsliberator-showcase-server
+            )"
+            if [[ "$runtime_running" == true &&
+                  "$corpus_running" == true &&
+                  "$server_running" == true ]] &&
+              docker exec xlsliberator-showcase-server \
+                /opt/open-swe-venv/bin/python -c \
+                'import socket
+          for endpoint in (("libreoffice-mcp", 8000), ("corpus-mcp", 8010)):
+              with socket.create_connection(endpoint, timeout=3):
+                  pass' &&
+              curl --fail --silent http://127.0.0.1:2024/health >/dev/null; then
               exit 0
             fi
             if (( attempt % 15 == 0 )); then
@@ -175,6 +196,8 @@ jobs:
             fi
             sleep 2
           done
+          docker logs xlsliberator-showcase-runtime
+          docker logs xlsliberator-showcase-corpus
           docker logs xlsliberator-showcase-server
           exit 1
 

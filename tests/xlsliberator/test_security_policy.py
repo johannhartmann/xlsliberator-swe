@@ -176,14 +176,34 @@ def test_sandbox_environment_drops_provider_service_and_github_secrets() -> None
 
 
 def test_sandbox_image_reuses_preexisting_numeric_uid_and_gid() -> None:
-    dockerfile = (
-        Path(__file__).parents[2] / "docker/xlsliberator-sandbox/Dockerfile"
-    ).read_text(encoding="utf-8")
+    dockerfile = (Path(__file__).parents[2] / "docker/xlsliberator-sandbox/Dockerfile").read_text(
+        encoding="utf-8"
+    )
 
     assert "if ! getent group 10001" in dockerfile
     assert "if ! getent passwd 10001" in dockerfile
     assert "getent group sandbox" not in dockerfile
     assert "getent passwd sandbox" not in dockerfile
+
+
+def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() -> None:
+    root = Path(__file__).parents[2]
+    workflow = (root / ".github/workflows/xlsliberator_showcase.yml").read_text(
+        encoding="utf-8"
+    )
+    server_image = (root / "docker/xlsliberator-server/Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "COPY --chown=10001:10001" in server_image
+    assert "USER 10001:10001" in server_image
+    assert 'sudo chown -R 10001:10001 "$bridge" "$runtime" "$hidden"' in workflow
+    assert 'chmod 0700 "$bridge" "$runtime" "$hidden"' in workflow
+    assert workflow.count("--env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1") == 2
+    assert workflow.count('--group-add "$(stat -c %g /var/run/docker.sock)"') == 2
+    assert '("libreoffice-mcp", 8000), ("corpus-mcp", 8010)' in workflow
+    assert "docker logs xlsliberator-showcase-runtime" in workflow
+    assert "docker logs xlsliberator-showcase-corpus" in workflow
 
 
 def test_security_adversary_requires_all_twelve_threats_and_derives_verdict() -> None:
