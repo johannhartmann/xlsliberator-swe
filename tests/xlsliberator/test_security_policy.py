@@ -188,15 +188,14 @@ def test_sandbox_image_reuses_preexisting_numeric_uid_and_gid() -> None:
 
 def test_showcase_services_share_a_private_numeric_identity_and_fail_closed() -> None:
     root = Path(__file__).parents[2]
-    workflow = (root / ".github/workflows/xlsliberator_showcase.yml").read_text(
-        encoding="utf-8"
-    )
-    server_image = (root / "docker/xlsliberator-server/Dockerfile").read_text(
-        encoding="utf-8"
-    )
+    workflow = (root / ".github/workflows/xlsliberator_showcase.yml").read_text(encoding="utf-8")
+    server_image = (root / "docker/xlsliberator-server/Dockerfile").read_text(encoding="utf-8")
 
     assert "COPY --chown=10001:10001" in server_image
     assert "USER 10001:10001" in server_image
+    assert "Preflight public workbook hydration in hostile sandbox" in workflow
+    assert "--network none" in workflow
+    assert "xlsprobe dossier /input/TetrisGameDemo.xlsb" in workflow
     assert 'sudo chown -R 10001:10001 "$bridge" "$runtime" "$hidden"' in workflow
     assert 'chmod 0700 "$bridge" "$runtime" "$hidden"' in workflow
     assert workflow.count("--env XLSLIBERATOR_MCP_TRUSTED_CONTAINER_PROXY=1") == 2

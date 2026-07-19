@@ -97,6 +97,34 @@ jobs:
             .
           scripts/check_sandbox_no_secrets.sh "${SANDBOX_IMAGE}"
 
+      - name: Preflight public workbook hydration in hostile sandbox
+        run: |
+          set -euo pipefail
+          source_dir="$(
+            dirname "$(realpath \
+              xlsliberator/demos/interactive-game/source/TetrisGameDemo.xlsb)"
+          )"
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --tmpfs /workspace:rw,nosuid,nodev,size=1g,uid=10001,gid=10001,mode=0700 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=1777 \
+            --tmpfs /home/sandbox:rw,nosuid,nodev,size=128m,uid=10001,gid=10001,mode=0700 \
+            --volume "${source_dir}:/input:ro" \
+            "${SANDBOX_IMAGE}" \
+            sh -euc '
+              xlsprobe dossier /input/TetrisGameDemo.xlsb \
+                --output /workspace \
+                --timeout-seconds 60 \
+                --max-source-mib 64
+              jq -e \
+                ".source_sha256 == \
+                  \"da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1\"" \
+                /workspace/migration/source/summary.json
+            '
+
       - name: Start trusted Docker services
         env:
           OPENAI_API_KEY: ${{ github.token }}
