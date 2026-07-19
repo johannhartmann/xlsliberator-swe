@@ -18,8 +18,7 @@ SHOWCASE_CONTEXT_WINDOW_TOKENS: Final[int] = 8_000
 SHOWCASE_MAX_OUTPUT_TOKENS: Final[int] = 768
 SHOWCASE_MAX_INPUT_TOKENS: Final[int] = SHOWCASE_CONTEXT_WINDOW_TOKENS - SHOWCASE_MAX_OUTPUT_TOKENS
 SHOWCASE_TASK_DESCRIPTION: Final[str] = (
-    "Delegate one independent workbook-migration task. Available specialists:\n"
-    "{available_agents}"
+    "Delegate one independent workbook-migration task. Available specialists:\n{available_agents}"
 )
 
 

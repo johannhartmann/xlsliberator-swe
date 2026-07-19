@@ -430,7 +430,7 @@ async def test_replay_bridge_forwards_declared_replay_id(tmp_path: Path) -> None
     result = await registry.curated[0].tool.ainvoke(
         {
             "evidence_paths_json": (
-                '{'
+                "{"
                 '"keyboard-control":"/workspace/migration/evidence/keyboard-control.zip",'
                 '"timer-tick":"/workspace/migration/evidence/timer-tick.zip"'
                 "}"

@@ -428,9 +428,7 @@ def _specialist_filesystem_middleware(
             backend=filesystem_backend,
             system_prompt="" if compact else None,
             tools=(
-                _COMPACT_SPECIALIST_FILESYSTEM_TOOLS
-                if compact
-                else _SPECIALIST_FILESYSTEM_TOOLS
+                _COMPACT_SPECIALIST_FILESYSTEM_TOOLS if compact else _SPECIALIST_FILESYSTEM_TOOLS
             ),
             _permissions=_permissions(profile),
         ),

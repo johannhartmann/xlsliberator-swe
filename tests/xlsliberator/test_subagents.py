@@ -63,11 +63,14 @@ def test_specialist_catalog_has_required_roles_and_isolated_skill_views() -> Non
     specs = build_migration_subagents(_model(), [])
 
     for spec in specs:
-        assert spec.get("skills") == [f"{SPECIALIST_SKILLS_ROOT}/{spec['name']}/"]
-        assert "must not certify or approve" in spec["system_prompt"]
-        assert "self_certified=false" in spec["system_prompt"]
-        assert spec.get("response_format") is SpecialistResult
-        middleware = spec.get("middleware")
+        declarative = cast(dict[str, Any], spec)
+        assert declarative.get("skills") == [
+            f"{SPECIALIST_SKILLS_ROOT}/{declarative['name']}/"
+        ]
+        assert "must not certify or approve" in declarative["system_prompt"]
+        assert "self_certified=false" in declarative["system_prompt"]
+        assert declarative.get("response_format") is SpecialistResult
+        middleware = declarative.get("middleware")
         assert middleware is not None
         assert isinstance(middleware[0], SpecialistTraceMiddleware)
 
@@ -210,14 +213,15 @@ def test_compact_specialists_use_precompiled_minimal_agents() -> None:
         assert "Do not copy a demo or special-case a fixture." in call["system_prompt"]
         middleware = call["middleware"]
         filesystem = next(item for item in middleware if isinstance(item, FilesystemMiddleware))
-        assert set(filesystem._enabled_tools or ()) == {
+        enabled_tools = set(filesystem._enabled_tools or ())
+        assert enabled_tools == {
             "ls",
             "read_file",
             "write_file",
             "edit_file",
         }
         assert filesystem._custom_system_prompt == ""
-        assert "execute" not in filesystem._enabled_tools
+        assert "execute" not in enabled_tools
 
 
 def test_candidate_tournament_isolates_two_candidates_and_evaluator() -> None:
