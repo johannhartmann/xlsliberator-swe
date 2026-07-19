@@ -269,9 +269,7 @@ async def test_showcase_agent_has_only_required_specialists_and_bounded_tools(
     assert captured["system_prompt"] == {"base": None}
     middleware = captured["middleware"]
     assert isinstance(middleware, list)
-    assert any(
-        type(item).__name__ == "ShowcaseProviderRateLimitMiddleware" for item in middleware
-    )
+    assert any(type(item).__name__ == "ShowcaseProviderRateLimitMiddleware" for item in middleware)
     workbook_context = next(
         item for item in middleware if type(item).__name__ == "WorkbookAttachmentMiddleware"
     )

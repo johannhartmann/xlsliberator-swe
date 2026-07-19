@@ -457,11 +457,7 @@ async def get_migration_reviewer_agent(config: RunnableConfig) -> Pregel:
                 SanitizeToolInputsMiddleware(),
                 ModelCallLimitMiddleware(run_limit=MODEL_CALL_RECURSION_LIMIT, exit_behavior="end"),
                 ToolErrorMiddleware(),
-                *(
-                    [ShowcaseProviderRateLimitMiddleware()]
-                    if settings.showcase_mode
-                    else []
-                ),
+                *([ShowcaseProviderRateLimitMiddleware()] if settings.showcase_mode else []),
                 SanitizeFireworksMessagesMiddleware(),
                 SanitizeThinkingBlocksMiddleware(),
             ],
