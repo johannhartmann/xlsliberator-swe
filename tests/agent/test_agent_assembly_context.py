@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from deepagents.backends import CompositeBackend
 from deepagents.backends.protocol import SandboxBackendProtocol
+from deepagents.middleware.filesystem import FilesystemMiddleware
 from langgraph.graph.state import RunnableConfig
 
 from agent.server import DEEPAGENT_ARTIFACT_ROOT, _resolve_agent_github_token, get_agent
@@ -129,6 +130,28 @@ async def test_agent_uses_writable_sandbox_artifact_root_for_context_management(
     assert backend.artifacts_root == DEEPAGENT_ARTIFACT_ROOT
     assert backend.routes == {}
     assert isinstance(backend.default, SandboxBackendProtocol)
+
+
+@pytest.mark.asyncio
+async def test_migration_specialists_use_permissioned_filesystem_without_execution() -> None:
+    config = _base_config()
+    configurable = config.setdefault("configurable", {})
+    assert isinstance(configurable, dict)
+    configurable["task_kind"] = "workbook_migration"
+
+    captured = await _capture_create_deep_agent_kwargs(config)
+    subagents = captured["subagents"]
+    assert isinstance(subagents, list)
+    assert subagents
+
+    for subagent in subagents:
+        middleware = subagent["middleware"]
+        filesystem = next(item for item in middleware if isinstance(item, FilesystemMiddleware))
+        assert isinstance(filesystem.backend, CompositeBackend)
+        assert not isinstance(filesystem.backend.default, SandboxBackendProtocol)
+        assert filesystem._permissions
+        assert filesystem._enabled_tools is not None
+        assert "execute" not in filesystem._enabled_tools
 
 
 @pytest.mark.asyncio

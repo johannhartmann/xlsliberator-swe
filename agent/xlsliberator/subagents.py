@@ -6,7 +6,10 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
-from deepagents.middleware.filesystem import FilesystemPermission
+from deepagents.backends import CompositeBackend
+from deepagents.backends.protocol import BackendProtocol
+from deepagents.backends.state import StateBackend
+from deepagents.middleware.filesystem import FilesystemMiddleware, FilesystemPermission
 from deepagents.middleware.subagents import SubAgent
 from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.language_models import BaseChatModel
@@ -17,6 +20,16 @@ from .skills import specialist_skill_source
 
 WORKSPACE = "/workspace"
 MIGRATION_ROOT = f"{WORKSPACE}/migration"
+SPECIALIST_ARTIFACT_ROOT = f"{WORKSPACE}/.deepagents/specialists"
+_SPECIALIST_FILESYSTEM_TOOLS = [
+    "ls",
+    "read_file",
+    "write_file",
+    "edit_file",
+    "delete",
+    "glob",
+    "grep",
+]
 
 
 class SpecialistResult(TypedDict):
@@ -371,16 +384,36 @@ def _tool_name(tool: BaseTool | Callable | dict[str, Any]) -> str:
     return value if isinstance(value, str) else ""
 
 
+def _artifact_root(profile: SpecialistProfile) -> str:
+    return f"{SPECIALIST_ARTIFACT_ROOT}/{profile.name}"
+
+
 def _permissions(profile: SpecialistProfile) -> list[FilesystemPermission]:
     return [
         FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
         FilesystemPermission(
             operations=["write"],
-            paths=list(profile.writable_paths),
+            paths=[*profile.writable_paths, f"{_artifact_root(profile)}/**"],
             mode="allow",
         ),
         FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
     ]
+
+
+def _specialist_filesystem_middleware(
+    profile: SpecialistProfile,
+    backend: BackendProtocol,
+) -> FilesystemMiddleware:
+    filesystem_backend = CompositeBackend(
+        default=backend,
+        routes={},
+        artifacts_root=_artifact_root(profile),
+    )
+    return FilesystemMiddleware(
+        backend=filesystem_backend,
+        tools=_SPECIALIST_FILESYSTEM_TOOLS,
+        _permissions=_permissions(profile),
+    )
 
 
 def _system_prompt(profile: SpecialistProfile) -> str:
@@ -408,10 +441,13 @@ summary to your declared trajectory JSON path."""
 def build_migration_subagents(
     model: BaseChatModel,
     tools: Sequence[BaseTool | Callable | dict[str, Any]],
+    *,
+    filesystem_backend: BackendProtocol | None = None,
 ) -> list[SubAgent]:
     """Build migration-only specialists with curated tools and isolated skills."""
 
     by_name = {_tool_name(tool): tool for tool in tools}
+    resolved_filesystem_backend = filesystem_backend or StateBackend()
     subagents: list[SubAgent] = []
     for profile in SPECIALIST_PROFILES:
         selected_tools = [by_name[name] for name in profile.tool_names if name in by_name]
@@ -424,8 +460,16 @@ def build_migration_subagents(
                 "model": model,
                 "tools": selected_tools,
                 "skills": [skill_source],
-                "permissions": _permissions(profile),
-                "middleware": [SpecialistTraceMiddleware(profile)],
+                # Replaces DeepAgents' default filesystem middleware. The
+                # adapter is intentionally not execution-capable, so path
+                # permissions cannot be bypassed through a shell command.
+                "middleware": [
+                    SpecialistTraceMiddleware(profile),
+                    _specialist_filesystem_middleware(
+                        profile,
+                        resolved_filesystem_backend,
+                    ),
+                ],
                 "response_format": SpecialistResult,
             }
         )
@@ -438,12 +482,17 @@ def subagents_for_task_kind(
     model: BaseChatModel,
     tools: Sequence[BaseTool | Callable | dict[str, Any]],
     migration_task_kind: str,
+    filesystem_backend: BackendProtocol | None = None,
 ) -> list[SubAgent]:
     """Keep domain specialists out of ordinary Open-SWE tasks."""
 
     if task_kind != migration_task_kind:
         return []
-    return build_migration_subagents(model, tools)
+    return build_migration_subagents(
+        model,
+        tools,
+        filesystem_backend=filesystem_backend,
+    )
 
 
 def candidate_tournament(

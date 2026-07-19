@@ -156,6 +156,7 @@ from .utils.sandbox_state import (
 )
 from .utils.tracing import AGENT_TRACING_PROJECT, traced_graph_factory
 from .xlsliberator.evaluation import MigrationEvaluationTraceMiddleware
+from .xlsliberator.filesystem_backend import FilesystemOnlyBackend
 from .xlsliberator.integrations.mcp import (
     MigrationMCPRegistry,
     load_migration_mcp_registry,
@@ -1147,6 +1148,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         model=subagent_model,
         tools=migration_implementation_tools,
         migration_task_kind=WORKBOOK_MIGRATION_TASK_KIND,
+        filesystem_backend=FilesystemOnlyBackend(lambda: backend_factory(None)),
     )
     if compact_showcase:
         migration_subagents = [

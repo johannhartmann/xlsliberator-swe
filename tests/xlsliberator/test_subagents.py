@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from deepagents.middleware.filesystem import FilesystemPermission
+from deepagents.backends import CompositeBackend
+from deepagents.backends.protocol import SandboxBackendProtocol
+from deepagents.middleware.filesystem import FilesystemMiddleware, FilesystemPermission
 from langchain_core.language_models import BaseChatModel
 
 from agent.xlsliberator.skills import SPECIALIST_SKILL_NAMES, SPECIALIST_SKILLS_ROOT
@@ -30,6 +32,15 @@ def _tools(*names: str) -> list[dict[str, Any]]:
 
 def _tool_names(spec: dict[str, Any]) -> list[str]:
     return [tool["name"] for tool in cast(list[dict[str, str]], spec["tools"])]
+
+
+def _filesystem_middleware(spec: dict[str, Any]) -> FilesystemMiddleware:
+    middleware = cast(list[object], spec["middleware"])
+    return next(item for item in middleware if isinstance(item, FilesystemMiddleware))
+
+
+def _filesystem_permissions(spec: dict[str, Any]) -> list[FilesystemPermission]:
+    return _filesystem_middleware(spec)._permissions
 
 
 def test_specialist_catalog_has_required_roles_and_isolated_skill_views() -> None:
@@ -100,9 +111,8 @@ def test_filesystem_policy_prevents_test_adversary_from_writing_candidates() -> 
     test_adversary = next(
         spec for spec in build_migration_subagents(_model(), []) if spec["name"] == "test-adversary"
     )
-    permissions_value = test_adversary.get("permissions")
-    assert permissions_value is not None
-    permissions = cast(list[FilesystemPermission], permissions_value)
+    assert "permissions" not in test_adversary
+    permissions = _filesystem_permissions(cast(dict[str, Any], test_adversary))
 
     assert permissions[0].operations == ["read"]
     assert permissions[0].paths == ["/**"]
@@ -118,14 +128,27 @@ def test_security_adversary_is_read_only_except_security_evidence() -> None:
         for spec in build_migration_subagents(_model(), [])
         if spec["name"] == "security-adversary"
     )
-    permissions_value = security_adversary.get("permissions")
-    assert permissions_value is not None
-    permissions = cast(list[FilesystemPermission], permissions_value)
+    assert "permissions" not in security_adversary
+    permissions = _filesystem_permissions(cast(dict[str, Any], security_adversary))
 
     assert "/workspace/migration/evidence/security/**" in permissions[1].paths
     assert all("/candidates/" not in path for path in permissions[1].paths)
     assert all("/hidden/" not in path for path in permissions[1].paths)
     assert permissions[-1].mode == "deny"
+
+
+def test_specialist_filesystem_cannot_execute_or_bypass_path_permissions() -> None:
+    specs = build_migration_subagents(_model(), [])
+
+    for spec in specs:
+        filesystem = _filesystem_middleware(cast(dict[str, Any], spec))
+        assert isinstance(filesystem.backend, CompositeBackend)
+        assert not isinstance(filesystem.backend.default, SandboxBackendProtocol)
+        assert filesystem._enabled_tools is not None
+        assert "execute" not in filesystem._enabled_tools
+        assert filesystem.backend.artifacts_root.startswith(
+            "/workspace/.deepagents/specialists/"
+        )
 
 
 def test_domain_subagents_are_absent_for_ordinary_tasks() -> None:
