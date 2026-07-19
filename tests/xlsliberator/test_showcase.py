@@ -76,9 +76,7 @@ def _build_bundle(root: Path) -> dict[str, Any]:
             "build": "candidate_generated.adapter:build_target",
             "controller": "candidate_generated.adapter:create_controller",
         },
-        "files": {
-            path: _sha256(content) for path, content in sorted(candidate_files.items())
-        },
+        "files": {path: _sha256(content) for path, content in sorted(candidate_files.items())},
         "capabilities": ["native-controls", "keyboard-events"],
     }
     candidate_manifest_bytes = (

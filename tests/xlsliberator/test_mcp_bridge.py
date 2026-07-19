@@ -299,10 +299,7 @@ async def test_scenario_bridge_binds_target_candidate_and_evidence(tmp_path: Pat
         "/workspace/migration/generated/candidate.zip",
     ]
     assert backend.uploads == ["/workspace/migration/evidence/keyboard-control.zip"]
-    assert (
-        backend.files["/workspace/migration/evidence/keyboard-control.zip"]
-        == b"real-gui-evidence"
-    )
+    assert backend.files["/workspace/migration/evidence/keyboard-control.zip"] == b"real-gui-evidence"
     assert list(tmp_path.iterdir()) == []
 
 

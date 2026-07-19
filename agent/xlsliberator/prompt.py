@@ -213,9 +213,9 @@ custom semantic runtime.
 The trusted runtime is generic: it knows only a versioned, content-bound
 candidate contract. It does not know this workbook, its hash, its sheets, its
 controls, its rules, or its scenarios. Derive the implementation from the
-hydrated original source and specialist findings. Do not copy a repository
-demo candidate, invoke a source-specific translator path, or add a special case
-for this fixture.
+hydrated original source and specialist findings.
+Do not copy a repository demo candidate, invoke a source-specific translator
+path, or add a special case for this fixture.
 
 Required workflow:
 

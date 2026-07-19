@@ -138,9 +138,9 @@ class CandidateIdentity(StrictModel):
 
     schema_version: Literal["1.0.0"] = "1.0.0"
     candidate_id: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{1,127}$")
-    source_sha256: Literal[
-        "da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"
-    ] = INTERACTIVE_GAME_SOURCE_SHA256
+    source_sha256: Literal["da1bddc2c20ed8f5557b547e04a84cb1b476eca010e30a6be549be650894e4d1"] = (
+        INTERACTIVE_GAME_SOURCE_SHA256
+    )
     target_build: Literal["26.2.4.2"] = LIBREOFFICE_BUILD
     build_entrypoint: str = Field(min_length=1, max_length=300)
     controller_entrypoint: str = Field(min_length=1, max_length=300)
@@ -511,9 +511,7 @@ class ShowcaseBundleManifest(StrictModel):
             raise ValueError("replay evidence is stale for the target")
         if self.replay.candidate_sha256 != candidate_sha256:
             raise ValueError("replay evidence used a different generated candidate")
-        if any(
-            scenario.candidate_sha256 != candidate_sha256 for scenario in self.scenarios
-        ):
+        if any(scenario.candidate_sha256 != candidate_sha256 for scenario in self.scenarios):
             raise ValueError("a public scenario used a different generated candidate")
 
     def _validate_models(self) -> None:
@@ -628,12 +626,7 @@ def _inspect_candidate_archive(
             for info in infos:
                 name = _safe_candidate_path(info.filename)
                 mode = info.external_attr >> 16
-                if (
-                    info.is_dir()
-                    or stat.S_ISLNK(mode)
-                    or info.flag_bits & 0x1
-                    or name in names
-                ):
+                if info.is_dir() or stat.S_ISLNK(mode) or info.flag_bits & 0x1 or name in names:
                     raise ValueError("candidate archive contains an unsafe member")
                 if info.file_size > MAX_CANDIDATE_FILE_BYTES:
                     raise ValueError(f"candidate archive member is oversized: {name}")
