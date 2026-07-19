@@ -20,7 +20,7 @@ jobs:
     env:
       SANDBOX_IMAGE: xlsliberator-eval:${{ github.sha }}
       OFFICE_IMAGE: xlsliberator-libreoffice:26.2.4.2
-      XLSLIBERATOR_SOURCE_COMMIT: 91c37a70b86fa519207be628505d759394cfff62
+      XLSLIBERATOR_SOURCE_COMMIT: 496c0e6db385380bfa853eb59c90c91ea0e2dc83
     steps:
       - uses: actions/checkout@v7
         with:
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: johannhartmann/xlsliberator
-          ref: 91c37a70b86fa519207be628505d759394cfff62
+          ref: 496c0e6db385380bfa853eb59c90c91ea0e2dc83
           path: xlsliberator
       - name: Build pinned LibreOffice image
         working-directory: xlsliberator
