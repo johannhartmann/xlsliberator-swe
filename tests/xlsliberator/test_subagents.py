@@ -234,8 +234,7 @@ def test_specialist_result_accepts_bounded_evidence_inventory() -> None:
         summary="S" * 1000,
         findings=tuple(f"finding-{index}: " + ("F" * 200) for index in range(12)),
         artifact_paths=tuple(
-            f"/workspace/migration/evidence/forensics/artifact-{index}.json"
-            for index in range(16)
+            f"/workspace/migration/evidence/forensics/artifact-{index}.json" for index in range(16)
         ),
         escalation="E" * 1000,
         confidence="MEDIUM",
